@@ -7,10 +7,16 @@ services:
       - "8000"
     volumes:
       - charcreator_data:/app/data
-    env_file:
-      - .env
     environment:
-      # Override CORS to accept requests from the nginx frontend
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./data/tagosCharCreator.db}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-anthropic/claude-sonnet-4-5}
+      PREFERRED_PROVIDER: ${PREFERRED_PROVIDER:-}
+      MAX_TOKENS: ${MAX_TOKENS:-8192}
+      TEMPERATURE: ${TEMPERATURE:-1.0}
+      TOP_P: ${TOP_P:-0.999}
+      # Allow requests from the nginx frontend container
       CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}"
     networks:
       - internal
