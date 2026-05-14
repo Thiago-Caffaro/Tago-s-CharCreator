@@ -55,6 +55,7 @@ export function GenerationPanel({ projectId }: Props) {
     if (streaming) return
     setStreaming(true)
     resetStreamingText()
+    setGeneratedCard(null)
     try {
       if (mode === 'full') {
         const result = await generationApi.fullCard(projectId, selectedPresetIds, appendStreamingText)

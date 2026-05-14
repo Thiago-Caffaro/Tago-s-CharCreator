@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, CheckSquare, Eye, Code, Wand2 } from 'lucide-react'
+import {
+  Download, CheckSquare, Eye, Code, Wand2, Save,
+  ImagePlus, FileJson, ImageIcon, ChevronDown,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import Editor from '@monaco-editor/react'
 import { useGenerationStore } from '../store/useGenerationStore'
@@ -9,7 +12,7 @@ import { Button } from '../components/ui/Button'
 import { CardPreview } from '../components/card-output/CardPreview'
 import { QualityChecklist } from '../components/card-output/QualityChecklist'
 import { validate_card_client } from '../utils/validators'
-import { exportCard } from '../utils/cardExporter'
+import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
 
 type Tab = 'preview' | 'json' | 'checklist'
@@ -17,11 +20,28 @@ type Tab = 'preview' | 'json' | 'checklist'
 export default function Output() {
   const { projectId } = useParams<{ projectId: string }>()
   const { generatedCard, streamingText, setGeneratedCard } = useGenerationStore()
-  const { currentProject } = useProjectStore()
+  const { currentProject, updateProject } = useProjectStore()
+
   const [tab, setTab] = useState<Tab>('preview')
   const [jsonText, setJsonText] = useState('')
   const [jsonErrors, setJsonErrors] = useState<string[]>([])
   const [fixing, setFixing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   useEffect(() => {
     if (generatedCard) {
@@ -56,11 +76,23 @@ export default function Output() {
     if (card) setGeneratedCard(card)
   }
 
+  const handleSave = async () => {
+    if (!projectId || !jsonText || saving) return
+    setSaving(true)
+    try {
+      await updateProject(Number(projectId), { last_generated_card: jsonText })
+      toast.success('Card salvo!')
+    } catch {
+      toast.error('Erro ao salvar')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleFixCheck = async (checkId: string) => {
     if (!generatedCard) return
     try {
       const result = await generationApi.fixCheck(JSON.stringify(generatedCard), checkId)
-      // strip markdown fences if any
       const clean = result.replace(/```(?:json)?\s*([\s\S]*?)\s*```/, '$1').trim()
       const patch = JSON.parse(clean)
       const updated: typeof generatedCard = {
@@ -101,12 +133,37 @@ export default function Output() {
     }
   }
 
-  const handleExport = () => {
-    if (!generatedCard) return
-    exportCard(generatedCard, currentProject?.character_name || 'character')
-    toast.success('Card exportado!')
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione um arquivo de imagem')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = ev => setAvatarDataUrl(ev.target?.result as string)
+    reader.readAsDataURL(file)
+    // reset so same file can be re-selected
+    e.target.value = ''
   }
 
+  const handleExportJson = () => {
+    if (!generatedCard) return
+    exportCard(generatedCard, currentProject?.character_name || 'character')
+    setExportOpen(false)
+  }
+
+  const handleExportPng = async () => {
+    if (!generatedCard) return
+    setExportOpen(false)
+    try {
+      await exportCardAsPng(generatedCard, avatarDataUrl, currentProject?.character_name || 'character')
+    } catch {
+      toast.error('Erro ao exportar PNG')
+    }
+  }
+
+  const charName = currentProject?.character_name || 'character'
   const hasContent = !!generatedCard || !!jsonText
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'preview', label: 'Preview', icon: Eye },
@@ -116,7 +173,9 @@ export default function Output() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1 px-4 pt-3 border-b border-[#2a2a2a]">
+
+      {/* ── Tab bar + actions ── */}
+      <div className="flex items-center gap-1 px-4 pt-3 border-b border-[#2a2a2a] shrink-0">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -128,18 +187,85 @@ export default function Output() {
             {t.label}
           </button>
         ))}
-        <div className="ml-auto pb-1">
+
+        <div className="ml-auto flex items-center gap-2 pb-1">
+
+          {/* Avatar upload */}
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            title={avatarDataUrl ? 'Trocar imagem do personagem' : 'Carregar imagem do personagem'}
+            className="relative flex items-center justify-center w-7 h-7 rounded-lg border border-[#333]
+              bg-[#242424] hover:border-[#555] transition-colors overflow-hidden shrink-0"
+          >
+            {avatarDataUrl ? (
+              <img src={avatarDataUrl} alt="avatar" className="w-full h-full object-cover" />
+            ) : (
+              <ImagePlus size={13} className="text-gray-500" />
+            )}
+          </button>
+
+          {/* Save button */}
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleExport}
-            disabled={!generatedCard}
+            onClick={handleSave}
+            loading={saving}
+            disabled={saving || !hasContent}
           >
-            <Download size={13} /> Exportar .json
+            <Save size={13} />
+            {saving ? 'Salvando…' : 'Salvar'}
           </Button>
+
+          {/* Export dropdown */}
+          <div ref={exportRef} className="relative">
+            <button
+              onClick={() => setExportOpen(o => !o)}
+              disabled={!generatedCard}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                bg-[#242424] border border-[#333] text-gray-300
+                hover:border-[#555] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download size={13} />
+              Exportar
+              <ChevronDown size={11} className={`text-gray-500 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {exportOpen && generatedCard && (
+              <div className="absolute right-0 mt-1 w-44 rounded-lg border border-[#333] bg-[#1e1e1e]
+                shadow-xl overflow-hidden z-50">
+                <button
+                  onClick={handleExportJson}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
+                    hover:bg-[#2a2a2a] transition-colors"
+                >
+                  <FileJson size={13} className="text-[#9b59b6]" />
+                  Download .json
+                </button>
+                <button
+                  onClick={handleExportPng}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
+                    hover:bg-[#2a2a2a] transition-colors border-t border-[#2a2a2a]"
+                >
+                  <ImageIcon size={13} className="text-[#9b59b6]" />
+                  <span className="flex-1 text-left">Download .png</span>
+                  {!avatarDataUrl && (
+                    <span className="text-[10px] text-gray-600 ml-1">placeholder</span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* ── Content ── */}
       {!hasContent ? (
         <div className="flex flex-col items-center justify-center flex-1 text-center">
           <p className="text-gray-500 text-sm">Nenhum card gerado ainda</p>

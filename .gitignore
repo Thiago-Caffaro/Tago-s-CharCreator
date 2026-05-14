@@ -49,3 +49,12 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+
+
+# Extra
+poppler/
+pdfs/
+
+# Claude session data
+.claude/
