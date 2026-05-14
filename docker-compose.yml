@@ -1,23 +1,44 @@
-version: "3.9"
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
-      - ./backend/data:/app/data
+      - charcreator_data:/app/data
     env_file:
       - .env
+    environment:
+      # Override CORS to accept requests from the nginx frontend
+      CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}"
+    networks:
+      - internal
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/projects')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
     restart: unless-stopped
+
+volumes:
+  charcreator_data:
+    driver: local
+
+networks:
+  internal:
+    driver: bridge
