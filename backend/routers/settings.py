@@ -64,6 +64,14 @@ def update_settings(data: SettingsUpdate):
 
 
 def _write_env():
+    """Persist current settings to data/.env so they survive container restarts.
+
+    data/ is mounted as a Docker volume, so this file outlives the container
+    image. On the next start pydantic-settings loads it as an override on top
+    of any environment variables passed by Docker / Portainer.
+    """
+    import os
+    os.makedirs("data", exist_ok=True)
     lines = [
         f"OPENROUTER_API_KEY={settings.openrouter_api_key}",
         f"OPENROUTER_BASE_URL={settings.openrouter_base_url}",
@@ -76,7 +84,7 @@ def _write_env():
         f"TOP_P={settings.top_p}",
     ]
     try:
-        with open(".env", "w") as f:
+        with open("data/.env", "w") as f:
             f.write("\n".join(lines) + "\n")
     except Exception:
         pass

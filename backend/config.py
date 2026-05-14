@@ -18,7 +18,11 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",")]
 
     class Config:
-        env_file = ".env"
+        # .env (local dev) is loaded first; data/.env (written by the settings
+        # panel and stored in the Docker volume) overrides it so user changes
+        # survive container restarts and rebuilds.
+        env_file = [".env", "data/.env"]
+        env_file_encoding = "utf-8"
         extra = "ignore"
 
 
