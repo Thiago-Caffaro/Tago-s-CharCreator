@@ -7,6 +7,7 @@ import { Select } from '../ui/Select'
 import { Textarea } from '../ui/Textarea'
 import { TokenCounter } from './TokenCounter'
 import { StreamingOutput } from './StreamingOutput'
+import { PresetMultiSelect } from './PresetMultiSelect'
 import { presetsApi } from '../../api/presets'
 import { generationApi } from '../../api/generation'
 import { useGenerationStore } from '../../store/useGenerationStore'
@@ -30,8 +31,8 @@ export function GenerationPanel({ projectId }: Props) {
   const navigate = useNavigate()
   const { currentProject, updateProject } = useProjectStore()
   const {
-    mode, selectedField, selectedPresetId, streaming,
-    setMode, setSelectedField, setSelectedPresetId,
+    mode, selectedField, selectedPresetIds, selectedPresetId, streaming,
+    setMode, setSelectedField, setSelectedPresetIds, setSelectedPresetId,
     setStreaming, appendStreamingText, resetStreamingText, setGeneratedCard,
   } = useGenerationStore()
 
@@ -43,10 +44,8 @@ export function GenerationPanel({ projectId }: Props) {
     presetsApi.list().then(setPresets).catch(() => {})
   }, [])
 
-  const fieldPresets = presets.filter(p =>
-    mode === 'full' ? true : p.target_field === selectedField
-  )
-
+  // Field presets for single-select (field/refine mode)
+  const fieldPresets = presets.filter(p => p.target_field === selectedField)
   const presetOptions = [
     { value: '', label: 'Sem preset' },
     ...fieldPresets.map(p => ({ value: String(p.id), label: p.name })),
@@ -58,7 +57,7 @@ export function GenerationPanel({ projectId }: Props) {
     resetStreamingText()
     try {
       if (mode === 'full') {
-        const result = await generationApi.fullCard(projectId, selectedPresetId ?? undefined, appendStreamingText)
+        const result = await generationApi.fullCard(projectId, selectedPresetIds, appendStreamingText)
         const { ok, card } = validate_card_client(result)
         if (ok && card) {
           setGeneratedCard(card)
@@ -106,7 +105,17 @@ export function GenerationPanel({ projectId }: Props) {
           />
         )}
 
-        {mode !== 'refine' && (
+        {/* Full card mode: multi-select presets */}
+        {mode === 'full' && (
+          <PresetMultiSelect
+            presets={presets}
+            selectedIds={selectedPresetIds}
+            onChange={setSelectedPresetIds}
+          />
+        )}
+
+        {/* Field mode: single-select preset */}
+        {mode === 'field' && (
           <Select
             label="Preset de Prompt"
             value={selectedPresetId ? String(selectedPresetId) : ''}

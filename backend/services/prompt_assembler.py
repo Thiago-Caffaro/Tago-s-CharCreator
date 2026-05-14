@@ -114,12 +114,23 @@ def build_full_card_prompt(
     project: Project,
     cards: list[ContextCard],
     global_rules: list[GenerationRule],
-    preset: Optional[FieldPreset] = None,
+    presets: list[FieldPreset] | None = None,
 ) -> tuple[str, str]:
-    system = preset.system_prompt_override if preset else DEFAULT_SYSTEM
+    # Always start from DEFAULT_SYSTEM so all fields get quality guidance.
+    # Each selected preset appends deep field-specific guidance on top.
+    system = DEFAULT_SYSTEM
+    if presets:
+        sections = []
+        for p in presets:
+            field_label = p.target_field.upper().replace('_', ' ')
+            sections.append(
+                f"\n\n━━━ FIELD-SPECIFIC GUIDANCE [{field_label}] — {p.name} ━━━\n"
+                f"{p.system_prompt_override}"
+            )
+        system += "".join(sections)
     if global_rules:
         rules_text = "\n".join(f"- {r.content}" for r in global_rules if r.is_active)
-        system += f"\n\nREGRAS ADICIONAIS:\n{rules_text}"
+        system += f"\n\nADDITIONAL RULES:\n{rules_text}"
 
     user_parts = [f"Nome do personagem: {project.character_name or project.name}"]
     for card in sorted(cards, key=lambda c: c.order_index):

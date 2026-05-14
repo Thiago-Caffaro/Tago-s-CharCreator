@@ -6,13 +6,16 @@ type GenerationMode = 'full' | 'field' | 'refine'
 interface GenerationStore {
   mode: GenerationMode
   selectedField: string
-  selectedPresetId: number | null
+  selectedPresetIds: number[]      // multi-select — used for full-card generation
+  selectedPresetId: number | null  // single-select — used for field/refine generation
   streaming: boolean
   streamingText: string
   generatedCard: CharaCardV2 | null
   tokenEstimate: number
   setMode: (mode: GenerationMode) => void
   setSelectedField: (field: string) => void
+  setSelectedPresetIds: (ids: number[]) => void
+  togglePresetId: (id: number) => void
   setSelectedPresetId: (id: number | null) => void
   setStreaming: (v: boolean) => void
   appendStreamingText: (chunk: string) => void
@@ -24,6 +27,7 @@ interface GenerationStore {
 export const useGenerationStore = create<GenerationStore>(set => ({
   mode: 'full',
   selectedField: 'description',
+  selectedPresetIds: [],
   selectedPresetId: null,
   streaming: false,
   streamingText: '',
@@ -32,6 +36,12 @@ export const useGenerationStore = create<GenerationStore>(set => ({
 
   setMode: mode => set({ mode }),
   setSelectedField: field => set({ selectedField: field }),
+  setSelectedPresetIds: ids => set({ selectedPresetIds: ids }),
+  togglePresetId: id => set(s => ({
+    selectedPresetIds: s.selectedPresetIds.includes(id)
+      ? s.selectedPresetIds.filter(x => x !== id)
+      : [...s.selectedPresetIds, id],
+  })),
   setSelectedPresetId: id => set({ selectedPresetId: id }),
   setStreaming: v => set({ streaming: v }),
   appendStreamingText: chunk => set(s => ({ streamingText: s.streamingText + chunk })),

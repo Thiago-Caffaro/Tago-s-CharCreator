@@ -1,13 +1,13 @@
 export const generationApi = {
   fullCard: async (
     projectId: number,
-    presetId?: number,
+    presetIds: number[],
     onChunk?: (chunk: string) => void,
   ): Promise<string> => {
     const response = await fetch('/api/generate/full-card', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, preset_id: presetId }),
+      body: JSON.stringify({ project_id: projectId, preset_ids: presetIds }),
     })
     return readStream(response, onChunk)
   },
@@ -85,11 +85,11 @@ export const generationApi = {
     return readStream(response, onChunk)
   },
 
-  tokenEstimate: async (projectId: number, presetId?: number): Promise<number> => {
+  tokenEstimate: async (projectId: number, presetIds: number[] = []): Promise<number> => {
     const response = await fetch('/api/generate/token-estimate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: projectId, preset_id: presetId }),
+      body: JSON.stringify({ project_id: projectId, preset_ids: presetIds }),
     })
     const data = await response.json()
     return data.input_tokens ?? 0

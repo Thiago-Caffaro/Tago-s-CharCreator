@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/generate", tags=["generation"])
 
 class FullCardRequest(BaseModel):
     project_id: int
-    preset_id: Optional[int] = None
+    preset_ids: list[int] = []
 
 
 class FieldRequest(BaseModel):
@@ -40,7 +40,7 @@ class LorebookGenRequest(BaseModel):
 
 class TokenEstimateRequest(BaseModel):
     project_id: int
-    preset_id: Optional[int] = None
+    preset_ids: list[int] = []
 
 
 class FixCardRequest(BaseModel):
@@ -228,8 +228,8 @@ def _load_context(project_id: int, session: Session):
 @router.post("/full-card")
 def generate_full_card(req: FullCardRequest, session: Session = Depends(get_session)):
     project, cards, global_rules = _load_context(req.project_id, session)
-    preset = session.get(FieldPreset, req.preset_id) if req.preset_id else None
-    system, user = prompt_assembler.build_full_card_prompt(project, cards, global_rules, preset)
+    presets = [p for pid in req.preset_ids if (p := session.get(FieldPreset, pid)) is not None]
+    system, user = prompt_assembler.build_full_card_prompt(project, cards, global_rules, presets)
 
     def gen():
         for chunk in stream_message(system, user):
@@ -369,8 +369,8 @@ REGRAS ESTRITAS:
 @router.post("/token-estimate")
 def token_estimate(req: TokenEstimateRequest, session: Session = Depends(get_session)):
     project, cards, global_rules = _load_context(req.project_id, session)
-    preset = session.get(FieldPreset, req.preset_id) if req.preset_id else None
-    system, user = prompt_assembler.build_full_card_prompt(project, cards, global_rules, preset)
+    presets = [p for pid in req.preset_ids if (p := session.get(FieldPreset, pid)) is not None]
+    system, user = prompt_assembler.build_full_card_prompt(project, cards, global_rules, presets)
     try:
         total = count_tokens(system, user)
     except Exception:

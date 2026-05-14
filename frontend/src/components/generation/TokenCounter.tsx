@@ -8,16 +8,16 @@ interface Props {
 }
 
 export function TokenCounter({ projectId }: Props) {
-  const { tokenEstimate, selectedPresetId, setTokenEstimate } = useGenerationStore()
+  const { tokenEstimate, selectedPresetIds, setTokenEstimate } = useGenerationStore()
 
   const estimate = useCallback(async () => {
     try {
-      const n = await generationApi.tokenEstimate(projectId, selectedPresetId ?? undefined)
+      const n = await generationApi.tokenEstimate(projectId, selectedPresetIds)
       setTokenEstimate(n)
     } catch {
       // silently ignore
     }
-  }, [projectId, selectedPresetId])
+  }, [projectId, selectedPresetIds])
 
   useEffect(() => { estimate() }, [estimate])
 
