@@ -4,7 +4,7 @@ services:
     expose:
       - "8000"
     volumes:
-      - charcreator_data:/app/data
+      - charcreator_data:/srv/data
     environment:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
