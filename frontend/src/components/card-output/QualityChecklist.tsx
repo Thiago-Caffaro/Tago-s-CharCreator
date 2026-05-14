@@ -25,6 +25,14 @@ const CHECKS: Check[] = [
     run: c => ({ passed: c.data.description.includes('<==') && c.data.description.includes('==>'), message: '' }),
   },
   {
+    id: 'desc_min_sections',
+    label: 'Description tem 3+ seções nomeadas',
+    run: c => {
+      const count = (c.data.description.match(/<==[^=]+==>|<== .+ ==>/g) || []).length
+      return { passed: count >= 3, message: `${count} seções` }
+    },
+  },
+  {
     id: 'desc_length',
     label: 'Description entre 400–900 palavras',
     run: c => {
@@ -54,6 +62,11 @@ const CHECKS: Check[] = [
     run: c => ({ passed: !c.data.first_mes.includes('{{user}}:') && !c.data.first_mes.match(/\*?You\s/i), message: '' }),
   },
   {
+    id: 'first_mes_has_action',
+    label: 'first_mes usa formato **negrito** para ações',
+    run: c => ({ passed: c.data.first_mes.includes('**'), message: '' }),
+  },
+  {
     id: 'mes_three_blocks',
     label: 'mes_example tem 3+ blocos <START>',
     run: c => {
@@ -72,9 +85,30 @@ const CHECKS: Check[] = [
     run: c => ({ passed: !!c.data.system_prompt?.trim(), message: '' }),
   },
   {
+    id: 'system_prompt_has_role',
+    label: 'system_prompt tem declaração de papel ({{char}})',
+    run: c => ({ passed: c.data.system_prompt?.includes('{{char}}') ?? false, message: '' }),
+  },
+  {
+    id: 'system_prompt_not_too_long',
+    label: 'system_prompt abaixo de ~500 tokens',
+    run: c => {
+      const wc = c.data.system_prompt?.split(/\s+/).filter(Boolean).length ?? 0
+      return { passed: wc <= 600, message: `~${wc} palavras` }
+    },
+  },
+  {
     id: 'has_post_history',
     label: 'post_history_instructions presente',
     run: c => ({ passed: !!c.data.post_history_instructions?.trim(), message: '' }),
+  },
+  {
+    id: 'post_history_under_100',
+    label: 'post_history_instructions abaixo de 100 palavras',
+    run: c => {
+      const wc = c.data.post_history_instructions?.split(/\s+/).filter(Boolean).length ?? 0
+      return { passed: wc > 0 && wc <= 100, message: `${wc} palavras` }
+    },
   },
   {
     id: 'alt_greetings',
@@ -101,9 +135,12 @@ const CHECKS: Check[] = [
 
 // checks that have a backend repair handler
 const FIXABLE_CHECKS = new Set([
-  'desc_sections', 'desc_length', 'personality_short', 'scenario_short',
-  'first_mes_nouser', 'mes_three_blocks', 'mes_starts', 'has_system_prompt',
-  'has_post_history', 'alt_greetings', 'no_hardcoded_name',
+  'desc_sections', 'desc_min_sections', 'desc_length', 'personality_short', 'scenario_short',
+  'first_mes_nouser', 'first_mes_has_action',
+  'mes_three_blocks', 'mes_starts',
+  'has_system_prompt', 'system_prompt_has_role',
+  'has_post_history', 'post_history_under_100',
+  'alt_greetings', 'no_hardcoded_name',
 ])
 
 interface Props {
