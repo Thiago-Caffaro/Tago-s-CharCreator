@@ -76,6 +76,7 @@ export interface AppSettings {
   max_tokens: number
   temperature: number
   top_p: number
+  field_max_tokens: Record<string, number>
 }
 
 export const CARD_TYPE_LABELS: Record<CardType, string> = {

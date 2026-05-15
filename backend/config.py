@@ -15,6 +15,23 @@ class Settings(BaseSettings):
     repetition_penalty: float = 1.05   # slight penalty prevents early self-truncation
     include_reasoning: bool = False     # disable reasoning tokens to save output budget
 
+    # Per-field output token budgets for chunked full-card generation.
+    # Stored as a JSON string so pydantic-settings can load it from the .env file.
+    field_max_tokens_json: str = (
+        '{"description":4096,"personality":2048,"scenario":1024,'
+        '"first_mes":3000,"mes_example":8192,'
+        '"system_prompt":3000,"post_history_instructions":1024,'
+        '"alternate_greetings":6000}'
+    )
+
+    @property
+    def field_max_tokens(self) -> dict:
+        import json
+        try:
+            return json.loads(self.field_max_tokens_json)
+        except Exception:
+            return {}
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",")]

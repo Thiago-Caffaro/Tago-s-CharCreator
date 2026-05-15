@@ -15,6 +15,7 @@ class SettingsRead(BaseModel):
     max_tokens: int
     temperature: float
     top_p: float
+    field_max_tokens: dict
 
 
 class SettingsUpdate(BaseModel):
@@ -24,6 +25,7 @@ class SettingsUpdate(BaseModel):
     max_tokens: Optional[int] = None
     temperature: Optional[float] = None
     top_p: Optional[float] = None
+    field_max_tokens: Optional[dict] = None
 
 
 def _mask_key(key: str) -> str:
@@ -41,11 +43,13 @@ def get_settings():
         max_tokens=settings.max_tokens,
         temperature=settings.temperature,
         top_p=settings.top_p,
+        field_max_tokens=settings.field_max_tokens,
     )
 
 
 @router.put("")
 def update_settings(data: SettingsUpdate):
+    import json as _json
     if data.openrouter_api_key is not None:
         settings.openrouter_api_key = data.openrouter_api_key
     if data.default_model is not None:
@@ -58,6 +62,8 @@ def update_settings(data: SettingsUpdate):
         settings.temperature = data.temperature
     if data.top_p is not None:
         settings.top_p = data.top_p
+    if data.field_max_tokens is not None:
+        settings.field_max_tokens_json = _json.dumps(data.field_max_tokens)
 
     _write_env()
     return {"ok": True}

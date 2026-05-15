@@ -289,7 +289,10 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
                 project, cards, field, global_rules, field_rules, preset
             )
 
-            max_tok = prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
+            # User-configured limit takes priority; fall back to code defaults
+            from ..config import settings as _settings
+            user_limits = _settings.field_max_tokens
+            max_tok = user_limits.get(field) or prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
             content = ""
             for chunk in stream_message(system, user, max_tokens=max_tok):
                 content += chunk

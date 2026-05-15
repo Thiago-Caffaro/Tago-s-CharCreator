@@ -282,6 +282,18 @@ function SortableRule({
   )
 }
 
+// Fields generated in chunked mode, in display order
+const CHUNKED_FIELDS: { key: string; label: string; hint: string }[] = [
+  { key: 'description',               label: 'description',               hint: 'Appearance, personality, relationship sections' },
+  { key: 'personality',               label: 'personality',               hint: 'Compressed dual-nature summary' },
+  { key: 'scenario',                  label: 'scenario',                  hint: 'Opening scene (< 100 words target)' },
+  { key: 'first_mes',                 label: 'first_mes',                 hint: 'Opening message with action + dialogue' },
+  { key: 'mes_example',               label: 'mes_example',               hint: '3+ <START> blocks, everyday → explicit' },
+  { key: 'system_prompt',             label: 'system_prompt',             hint: '5-component role + format + rules prompt' },
+  { key: 'post_history_instructions', label: 'post_history_instructions', hint: 'Format + behavioral anchor (< 100 words)' },
+  { key: 'alternate_greetings',       label: 'alternate_greetings',       hint: '4 distinct opening situations (JSON array)' },
+]
+
 export default function Settings() {
   const { settings, fetchSettings, updateSettings } = useSettingsStore()
   const [rules, setRules] = useState<GenerationRule[]>([])
@@ -290,6 +302,7 @@ export default function Settings() {
   const [provider, setProvider] = useState('')
   const [maxTokens, setMaxTokens] = useState(8192)
   const [temperature, setTemperature] = useState(1.0)
+  const [fieldMaxTokens, setFieldMaxTokens] = useState<Record<string, number>>({})
   const [newRuleName, setNewRuleName] = useState('')
   const [newRuleContent, setNewRuleContent] = useState('')
   const [saving, setSaving] = useState(false)
@@ -307,6 +320,7 @@ export default function Settings() {
       setProvider(settings.preferred_provider ?? '')
       setMaxTokens(settings.max_tokens)
       setTemperature(settings.temperature)
+      setFieldMaxTokens(settings.field_max_tokens ?? {})
     }
   }, [settings])
 
@@ -319,6 +333,7 @@ export default function Settings() {
         preferred_provider: provider,
         max_tokens: maxTokens,
         temperature,
+        field_max_tokens: fieldMaxTokens,
       })
       setApiKey('')
       toast.success('Configurações salvas!')
@@ -425,6 +440,61 @@ export default function Settings() {
         </div>
 
         <Button loading={saving} onClick={handleSaveSettings}>Salvar</Button>
+      </section>
+
+      {/* ── Per-field token budgets ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="border-b border-[#2a2a2a] pb-2">
+          <h2 className="text-sm font-semibold text-gray-300">
+            Tokens por Campo — Geração Chunked
+          </h2>
+          <p className="text-xs text-gray-600 mt-0.5">
+            Cada campo é gerado em uma chamada separada. Aumente o limite se o campo estiver sendo cortado
+            (finish_reason: <span className="font-mono text-gray-500">length</span> no OpenRouter).
+            Diminua se quiser economizar créditos.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-[#2a2a2a] overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto] text-[10px] font-semibold text-gray-600 uppercase tracking-wider
+            px-3 py-2 bg-[#161616] border-b border-[#2a2a2a]">
+            <span>Campo</span>
+            <span className="w-24 text-right">Max tokens</span>
+          </div>
+
+          {CHUNKED_FIELDS.map(({ key, label, hint }, i) => (
+            <div
+              key={key}
+              className={`grid grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5
+                ${i % 2 === 0 ? 'bg-[#1a1a1a]' : 'bg-[#1e1e1e]'}
+                ${i < CHUNKED_FIELDS.length - 1 ? 'border-b border-[#242424]' : ''}`}
+            >
+              <div className="min-w-0">
+                <span className="text-xs font-mono text-gray-300">{label}</span>
+                <span className="text-[10px] text-gray-600 ml-2">{hint}</span>
+              </div>
+              <input
+                type="number"
+                min={256}
+                max={32768}
+                step={256}
+                value={fieldMaxTokens[key] ?? ''}
+                onChange={e => setFieldMaxTokens(prev => ({
+                  ...prev,
+                  [key]: Math.max(256, Math.min(32768, Number(e.target.value) || 256)),
+                }))}
+                className="w-24 bg-[#242424] border border-[#333] rounded-md px-2 py-1 text-xs text-right
+                  text-gray-200 font-mono focus:outline-none focus:ring-1 focus:ring-[#9b59b6]/50
+                  focus:border-[#9b59b6] transition-colors"
+              />
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[10px] text-gray-600">
+          Salvo junto com as configurações principais acima. Não esqueça de clicar em{' '}
+          <span className="text-gray-400">Salvar</span>.
+        </p>
       </section>
 
       <section className="space-y-4">
