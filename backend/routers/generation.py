@@ -225,15 +225,94 @@ def _load_context(project_id: int, session: Session):
     return project, list(cards), list(global_rules)
 
 
+# Fields generated one by one in chunked mode, in this order.
+# Each is its own API call so the model has the full output window available.
+_CHUNKED_FIELDS = [
+    'description',
+    'personality',
+    'scenario',
+    'first_mes',
+    'mes_example',
+    'system_prompt',
+    'post_history_instructions',
+    'alternate_greetings',
+]
+
+
 @router.post("/full-card")
 def generate_full_card(req: FullCardRequest, session: Session = Depends(get_session)):
+    """Generate a full character card field-by-field (chunked mode).
+
+    Instead of one massive API call that starves the model's output window,
+    each field is generated with a compact, focused system prompt (~300 tokens)
+    and its own per-field max_tokens budget.  The stream emits:
+
+        __FIELD__:<field_name>\\n   — marker before each field starts
+        ...field content...         — streamed live as the model generates
+        __DONE__\\n                 — marker before the final assembled JSON
+        {...chara_card_v2 JSON...}  — complete card, ready for validation
+    """
+    import json as _json
+
     project, cards, global_rules = _load_context(req.project_id, session)
     presets = [p for pid in req.preset_ids if (p := session.get(FieldPreset, pid)) is not None]
-    system, user = prompt_assembler.build_full_card_prompt(project, cards, global_rules, presets)
+
+    # Preload all per-field rules in one query
+    all_field_rules = session.exec(
+        select(GenerationRule).where(
+            GenerationRule.scope == RuleScope.PER_FIELD,
+            GenerationRule.is_active == True,
+        )
+    ).all()
+    field_rules_map: dict[str, list[GenerationRule]] = {}
+    for r in all_field_rules:
+        field_rules_map.setdefault(r.target_field, []).append(r)
 
     def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
+        card_data: dict = {
+            "name": project.character_name or project.name,
+            "creator_notes": "",
+            "character_version": "1.0",
+            "avatar": "none",
+            "talkativeness": "0.5",
+            "tags": [],
+        }
+
+        for field in _CHUNKED_FIELDS:
+            yield f"__FIELD__:{field}\n"
+
+            # Prefer a user-selected preset for this field; fall back to the
+            # compact FIELD_SYSTEM prompt which is ~5x smaller than DEFAULT_SYSTEM
+            preset = next((p for p in presets if p.target_field == field), None)
+            field_rules = field_rules_map.get(field, [])
+            system, user = prompt_assembler.build_field_prompt(
+                project, cards, field, global_rules, field_rules, preset
+            )
+
+            max_tok = prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
+            content = ""
+            for chunk in stream_message(system, user, max_tokens=max_tok):
+                content += chunk
+                yield chunk
+
+            # Parse array fields
+            if field in ('alternate_greetings', 'tags'):
+                raw = content.strip()
+                # Strip accidental markdown fences
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+                try:
+                    parsed = _json.loads(raw)
+                    card_data[field] = parsed if isinstance(parsed, list) else [raw]
+                except Exception:
+                    card_data[field] = [raw] if field == 'alternate_greetings' else []
+            else:
+                card_data[field] = content.strip()
+
+            yield "\n"
+
+        card = {"spec": "chara_card_v2", "spec_version": "2.0", "data": card_data}
+        yield f"__DONE__\n{_json.dumps(card, ensure_ascii=False)}"
 
     return StreamingResponse(gen(), media_type="text/plain")
 

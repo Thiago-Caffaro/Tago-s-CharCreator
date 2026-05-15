@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     max_tokens: int = 8192
     temperature: float = 1.0
     top_p: float = 0.999
+    repetition_penalty: float = 1.05   # slight penalty prevents early self-truncation
+    include_reasoning: bool = False     # disable reasoning tokens to save output budget
 
     @property
     def cors_origins_list(self) -> List[str]:

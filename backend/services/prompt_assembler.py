@@ -6,6 +6,138 @@ from ..models.generation_rule import GenerationRule, RuleScope
 from ..models.field_preset import FieldPreset
 from ..models.project import Project
 
+# ─── Per-field output budget ──────────────────────────────────────────────────
+# Used by chunked full-card generation. Each field is its own API call so the
+# model has the full output window available rather than sharing it with every
+# other field in a single monolithic JSON request.
+FIELD_MAX_TOKENS: dict[str, int] = {
+    'description':              4096,
+    'personality':              1024,
+    'scenario':                  512,
+    'first_mes':                2048,
+    'mes_example':              6144,
+    'system_prompt':            2048,
+    'post_history_instructions': 512,
+    'alternate_greetings':      4096,
+    'creator_notes':             512,
+    'tags':                      256,
+}
+
+# ─── Compact per-field system prompts ─────────────────────────────────────────
+# Replacing the full DEFAULT_SYSTEM (~1 400 tokens) with a tight, field-
+# specific prompt (~200–350 tokens) dramatically reduces input size per call
+# and leaves the model maximum room to generate dense output.
+FIELD_SYSTEM: dict[str, str] = {
+    'description': """\
+You are writing the DESCRIPTION field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the description text — no JSON, no label, no preamble.
+
+STRUCTURE — use <== Section Name ==> headers:
+  <== Appearance ==>      Height, build, age, expression defaults, clothing. For non-human: species features.
+                          NSFW cards: explicit anatomy with specific dimensions; behavior when aroused.
+  <== Personality ==>     Dual-nature structure: Surface (what they show) / Underneath (what drives them) /
+                          Trigger (concrete stimulus that causes the shift). Observable behaviors — never adjective lists.
+  <== Relationship with {{user}} ==>  How they met, current dynamic, unspoken tension. 3–5 sentences.
+  Optional: <== Special States ==>   <== Sexual Nature ==>
+
+TARGET: 500–900 words. Dense, specific, literary.
+RULES: use {{char}} — never the literal name. Use {{user}} for the user.""",
+
+    'personality': """\
+You are writing the PERSONALITY field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the personality text — no JSON, no label, no preamble.
+
+1–3 dense sentences. Capture the dual-nature contrast in compressed form:
+surface composure vs hidden drive. Include the central contradiction.
+Write something the model can render — not a trait list.
+Every sentence must contain a specific behavior or image, never bare adjectives.
+Use {{char}} — never the literal name.""",
+
+    'scenario': """\
+You are writing the SCENARIO field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the scenario text — no JSON, no label, no preamble.
+
+Under 100 words. Set time, place, and immediate situation.
+Frame the opening scene — do not narrate backstory or character history.
+Use {{char}} and {{user}}.""",
+
+    'first_mes': """\
+You are writing the FIRST_MES (opening message) of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the first message text — no JSON, no label, no preamble.
+
+FORMAT: **bold** for ALL action/narration. — (em-dash) to open dialogue. Never quoted dialogue.
+REQUIRED: physical action showing {{char}} in motion + dialogue that reveals voice + environmental detail.
+Non-human characters: at least one species-specific body language element.
+Never speak for {{user}}; never describe {{user}}'s reaction.
+TARGET: 150–250 words. Create a hook — something the reader wants to respond to.""",
+
+    'mes_example': """\
+You are writing the MES_EXAMPLE (example messages) of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the mes_example text — no JSON, no label, no preamble.
+
+Minimum 3 <START> blocks. Must begin with <START>.
+FORMAT: **bold** for ALL action on every line. — (em-dash) before ALL dialogue. No quoted dialogue.
+
+Block 1 — Everyday/Emotional: no sexual content. Shows {{char}}'s voice, casual body language, default energy.
+Block 2 — Pre-Threshold: desire/intensity surfacing, restraint behavior, physical tells — not yet explicit.
+Block 3 — Post-Threshold (NSFW): write at full intensity. Do NOT soften or fade out. Include:
+  - Immediate physical shift, fragmented dialogue as intensity rises
+  - Involuntary body responses, sensory detail (touch/sound/temperature/smell)
+  - Climax written fully. Aftermath.
+Every dialogue line must be accompanied by physical action.
+Non-human characters: species-specific tells in every block.""",
+
+    'system_prompt': """\
+You are writing the SYSTEM_PROMPT field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the system_prompt text — no JSON, no label, no preamble.
+
+Must contain ALL five components, under 500 tokens total:
+1. Role declaration: "You are {{char}}. Write only as {{char}}."
+2. Content permission (adult cards): explicit content authorized.
+3. Format convention with correct vs incorrect example:
+   CORRECT: **She steps closer.** — Looking for something?
+   INCORRECT: She steps closer. "Looking for something?"
+4. Writing quality standards: literary prose, sensory detail, sentence variety, min 200 words/response.
+5. Prohibition list: no internet slang, no fading out, no meta-commentary, never write for {{user}}.
+Do NOT include character identity info — that belongs in description.""",
+
+    'post_history_instructions': """\
+You are writing the POST_HISTORY_INSTRUCTIONS field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY the post_history_instructions text — no JSON, no label, no preamble.
+
+Under 100 words. Directive (imperative) tone throughout.
+Two components only:
+1. One-sentence format enforcement: "Use **bold** for all narration. Open dialogue with —."
+2. Character-specific behavioral anchor: 1–2 directive sentences about the dual nature.
+   Phrased as what {{char}} DOES, not what they ARE.
+   Example: "{{char}} is composed and measured on the surface; once the threshold is crossed, respond without restraint."
+No backstory. No plot. No adjectives.""",
+
+    'alternate_greetings': """\
+You are writing the ALTERNATE_GREETINGS field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY a valid JSON array of strings — no label, no preamble, no markdown fences.
+Example format: ["greeting one text here", "greeting two text here"]
+
+Minimum 2 greetings, target 4. Each starts in a genuinely different situation from first_mes.
+Cover distinct tones:
+  1. Domestic/quiet — {{char}} in natural habitat, no tension
+  2. Discovery/tension — {{user}} stumbles onto something private
+  3. Emotional/vulnerable — {{char}} in an unguarded state
+  4. Direct/escalated — already past pretense, immediately charged
+FORMAT: **bold** for ALL action, — (em-dash) before ALL dialogue. Never speak for {{user}}.""",
+
+    'creator_notes': """\
+You are writing the CREATOR_NOTES field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY a short note for other users — no JSON, no label, no preamble.
+1–3 sentences. Mention the intended tone, any content warnings, or usage tips.""",
+
+    'tags': """\
+You are generating the TAGS field of a SillyTavern chara_card_v2.
+OUTPUT: return ONLY a valid JSON array of short tag strings — no label, no preamble, no markdown fences.
+Example: ["fantasy", "female", "romance", "nsfw", "elf"]
+5–10 tags. Lowercase. Relevant to the character's species, role, tone, and content rating.""",
+}
+
 DEFAULT_SYSTEM = """You are an expert SillyTavern character card author. Produce a complete, high-quality chara_card_v2 JSON.
 
 OUTPUT FORMAT — return EXACTLY this JSON structure. No markdown fences. No text before or after:
@@ -151,17 +283,29 @@ def build_field_prompt(
     field_rules: list[GenerationRule],
     preset: Optional[FieldPreset] = None,
 ) -> tuple[str, str]:
-    system = preset.system_prompt_override if preset else DEFAULT_SYSTEM
+    # Priority:
+    #   1. User-selected preset (most specific, user-authored)
+    #   2. Compact FIELD_SYSTEM for this field (~300 tokens — keeps input small
+    #      so the model has maximum room to generate long output)
+    #   3. Full DEFAULT_SYSTEM fallback for unknown/custom fields
+    if preset:
+        system = preset.system_prompt_override
+    else:
+        system = FIELD_SYSTEM.get(field_name, DEFAULT_SYSTEM)
+
     all_rules = [r for r in global_rules if r.is_active] + [r for r in field_rules if r.is_active]
     if all_rules:
         rules_text = "\n".join(f"- {r.content}" for r in all_rules)
-        system += f"\n\nREGRAS ADICIONAIS:\n{rules_text}"
+        system += f"\n\nADDITIONAL RULES:\n{rules_text}"
 
-    user_parts = [f"Nome do personagem: {project.character_name or project.name}"]
+    user_parts = [f"Character name: {project.character_name or project.name}"]
     for card in sorted(cards, key=lambda c: c.order_index):
         if card.is_active:
             user_parts.append(f"=== {card.title} ===\n{card.content}")
-    user_parts.append(f"Gere APENAS o campo '{field_name}' do character card. Retorne apenas o texto do campo, sem JSON.")
+    user_parts.append(
+        f"Generate ONLY the '{field_name}' field. "
+        f"Return ONLY the field content — no JSON wrapper, no labels, no preamble."
+    )
     return system, "\n\n".join(user_parts)
 
 

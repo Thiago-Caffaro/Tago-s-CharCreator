@@ -27,13 +27,26 @@ const MODE_OPTIONS = [
   { value: 'refine', label: 'Refinar Campo' },
 ]
 
+// Human-readable labels for the field progress display
+const FIELD_LABELS: Record<string, string> = {
+  description:              'Aparência & Personalidade',
+  personality:              'Personalidade (resumo)',
+  scenario:                 'Cenário',
+  first_mes:                'Primeira Mensagem',
+  mes_example:              'Exemplos de Mensagem',
+  system_prompt:            'System Prompt',
+  post_history_instructions:'Post-History',
+  alternate_greetings:      'Saudações Alternativas',
+}
+
 export function GenerationPanel({ projectId }: Props) {
   const navigate = useNavigate()
   const { currentProject, updateProject } = useProjectStore()
   const {
     mode, selectedField, selectedPresetIds, selectedPresetId, streaming,
     setMode, setSelectedField, setSelectedPresetIds, setSelectedPresetId,
-    setStreaming, appendStreamingText, resetStreamingText, setGeneratedCard,
+    setStreaming, appendStreamingText, resetStreamingText,
+    setCurrentField, setGeneratedCard,
   } = useGenerationStore()
 
   const [presets, setPresets] = useState<FieldPreset[]>([])
@@ -56,22 +69,68 @@ export function GenerationPanel({ projectId }: Props) {
     setStreaming(true)
     resetStreamingText()
     setGeneratedCard(null)
+    setCurrentField(null)
+
     try {
       if (mode === 'full') {
-        const result = await generationApi.fullCard(projectId, selectedPresetIds, appendStreamingText)
-        const { ok, card } = validate_card_client(result)
+        // Full-card uses chunked generation — the stream emits:
+        //   __FIELD__:<name>\n  → field starting marker
+        //   ...content...       → streamed live
+        //   __DONE__\n          → end marker
+        //   {...JSON...}        → complete assembled card
+        //
+        // We strip the markers from the display text and show a clean
+        // field-by-field progress view in StreamingOutput.
+
+        let pendingLine = ''
+
+        const result = await generationApi.fullCard(
+          projectId,
+          selectedPresetIds,
+          (chunk: string) => {
+            // Process chunk character by character to handle markers that may
+            // span multiple chunks cleanly.
+            const combined = pendingLine + chunk
+            const lines = combined.split('\n')
+            // Last element may be an incomplete line — carry it forward
+            pendingLine = lines.pop() ?? ''
+
+            for (const line of lines) {
+              if (line.startsWith('__FIELD__:')) {
+                const field = line.slice('__FIELD__:'.length)
+                setCurrentField(field)
+                const label = FIELD_LABELS[field] ?? field
+                appendStreamingText(`\n━━ ${label} ━━\n`)
+              } else if (line === '__DONE__') {
+                setCurrentField(null)
+                appendStreamingText('\n✓ Montando card…\n')
+              } else {
+                // Regular content — display it (skip the JSON blob after __DONE__)
+                appendStreamingText(line + '\n')
+              }
+            }
+          },
+        )
+
+        // Extract the assembled JSON that comes after __DONE__\n
+        const doneIdx = result.indexOf('__DONE__\n')
+        const jsonStr = doneIdx >= 0 ? result.slice(doneIdx + 9) : result
+
+        const { ok, card } = validate_card_client(jsonStr)
         if (ok && card) {
           setGeneratedCard(card)
-          await updateProject(projectId, { last_generated_card: result })
+          await updateProject(projectId, { last_generated_card: jsonStr })
           toast.success('Card gerado! Veja em Output.')
           navigate(`/editor/${projectId}/output`)
         } else {
           toast.error('JSON gerado tem problemas. Verifique o Output.')
           navigate(`/editor/${projectId}/output`)
         }
+
       } else if (mode === 'field') {
         await generationApi.field(projectId, selectedField, selectedPresetId ?? undefined, appendStreamingText)
         toast.success(`Campo '${selectedField}' gerado!`)
+
       } else if (mode === 'refine') {
         await generationApi.refine(projectId, selectedField, refineContent, refineInstruction, appendStreamingText)
         toast.success(`Campo '${selectedField}' refinado!`)
@@ -80,6 +139,7 @@ export function GenerationPanel({ projectId }: Props) {
       toast.error(e.message || 'Erro na geração')
     } finally {
       setStreaming(false)
+      setCurrentField(null)
     }
   }
 

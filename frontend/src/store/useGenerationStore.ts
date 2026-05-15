@@ -10,6 +10,7 @@ interface GenerationStore {
   selectedPresetId: number | null  // single-select — used for field/refine generation
   streaming: boolean
   streamingText: string
+  currentField: string | null      // field being generated in chunked full-card mode
   generatedCard: CharaCardV2 | null
   tokenEstimate: number
   setMode: (mode: GenerationMode) => void
@@ -20,6 +21,7 @@ interface GenerationStore {
   setStreaming: (v: boolean) => void
   appendStreamingText: (chunk: string) => void
   resetStreamingText: () => void
+  setCurrentField: (field: string | null) => void
   setGeneratedCard: (card: CharaCardV2 | null) => void
   setTokenEstimate: (n: number) => void
 }
@@ -31,6 +33,7 @@ export const useGenerationStore = create<GenerationStore>(set => ({
   selectedPresetId: null,
   streaming: false,
   streamingText: '',
+  currentField: null,
   generatedCard: null,
   tokenEstimate: 0,
 
@@ -46,6 +49,7 @@ export const useGenerationStore = create<GenerationStore>(set => ({
   setStreaming: v => set({ streaming: v }),
   appendStreamingText: chunk => set(s => ({ streamingText: s.streamingText + chunk })),
   resetStreamingText: () => set({ streamingText: '' }),
+  setCurrentField: field => set({ currentField: field }),
   setGeneratedCard: card => set({ generatedCard: card }),
   setTokenEstimate: n => set({ tokenEstimate: n }),
 }))
