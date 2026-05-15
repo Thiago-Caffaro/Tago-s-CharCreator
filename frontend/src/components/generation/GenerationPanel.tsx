@@ -84,6 +84,8 @@ export function GenerationPanel({ projectId }: Props) {
 
         let pendingLine = ''
 
+        let afterDone = false
+
         const result = await generationApi.fullCard(
           projectId,
           selectedPresetIds,
@@ -102,15 +104,21 @@ export function GenerationPanel({ projectId }: Props) {
                 const label = FIELD_LABELS[field] ?? field
                 appendStreamingText(`\n━━ ${label} ━━\n`)
               } else if (line === '__DONE__') {
+                afterDone = true
                 setCurrentField(null)
                 appendStreamingText('\n✓ Montando card…\n')
-              } else {
+              } else if (!afterDone) {
                 // Regular content — display it (skip the JSON blob after __DONE__)
                 appendStreamingText(line + '\n')
               }
             }
           },
         )
+
+        // Flush any remaining partial line from the buffer
+        if (pendingLine && !afterDone && !pendingLine.startsWith('{')) {
+          appendStreamingText(pendingLine + '\n')
+        }
 
         // Extract the assembled JSON that comes after __DONE__\n
         const doneIdx = result.indexOf('__DONE__\n')
@@ -122,9 +130,11 @@ export function GenerationPanel({ projectId }: Props) {
           await updateProject(projectId, { last_generated_card: jsonStr })
           toast.success('Card gerado! Veja em Output.')
           navigate(`/editor/${projectId}/output`)
+          resetStreamingText()
         } else {
           toast.error('JSON gerado tem problemas. Verifique o Output.')
           navigate(`/editor/${projectId}/output`)
+          resetStreamingText()
         }
 
       } else if (mode === 'field') {

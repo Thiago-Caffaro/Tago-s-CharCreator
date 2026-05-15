@@ -27,7 +27,10 @@ def stream_message(system: str, user: str, max_tokens: int | None = None):
 
     # Disable reasoning tokens — they eat into the output budget on reasoning-
     # capable models (GLM-Z1, DeepSeek-R1, etc.) without helping text quality.
+    # OpenRouter standard format: reasoning.exclude = true
+    # Some models also respect include_reasoning = false as a fallback.
     if not settings.include_reasoning:
+        extra_body["reasoning"] = {"exclude": True}
         extra_body["include_reasoning"] = False
 
     # Repetition penalty — prevents the model from self-truncating after
