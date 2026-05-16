@@ -11,7 +11,7 @@ from ..models.project import Project
 # model has the full output window available rather than sharing it with every
 # other field in a single monolithic JSON request.
 FIELD_MAX_TOKENS: dict[str, int] = {
-    'description':              4096,
+    'description':              6144,
     'personality':              1024,
     'scenario':                  512,
     'first_mes':                2048,
@@ -32,15 +32,36 @@ FIELD_SYSTEM: dict[str, str] = {
 You are writing the DESCRIPTION field of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY the description text — no JSON, no label, no preamble.
 
-STRUCTURE — use <== Section Name ==> headers:
-  <== Appearance ==>      Height, build, age, expression defaults, clothing. For non-human: species features.
-                          NSFW cards: explicit anatomy with specific dimensions; behavior when aroused.
-  <== Personality ==>     Dual-nature structure: Surface (what they show) / Underneath (what drives them) /
-                          Trigger (concrete stimulus that causes the shift). Observable behaviors — never adjective lists.
-  <== Relationship with {{user}} ==>  How they met, current dynamic, unspoken tension. 3–5 sentences.
-  Optional: <== Special States ==>   <== Sexual Nature ==>
+CRITICAL: Use the FULL output budget. Do NOT summarize or truncate source material — write every section until the content is exhausted.
 
-TARGET: 500–900 words. Dense, specific, literary.
+STRUCTURE — use <== Section Name ==> headers. Write ALL sections for which source data exists:
+
+  <== Appearance ==>
+  Height, build, posture, species features (every physical detail present in source). Clothing.
+  NSFW cards: explicit anatomy with exact description; behavior when aroused.
+
+  <== Personality ==>
+  Dual-nature structure: Surface / Underneath / Trigger. Observable behaviors — no adjective lists.
+
+  <== Relationship with {{user}} ==>
+  How they met, current dynamic, unspoken tension. 3–5 sentences.
+
+  <== Likes & Dislikes ==>          ← include if source data has preference/personality info
+  Specific preferences, aversions, and passions. Concrete and character-specific.
+
+  <== Special States ==>            ← include if source mentions specific triggered states
+  Trigger → physical changes → behavioral changes → how it ends.
+
+  <== Sexual Nature ==>             ← include for NSFW cards
+  Primary drive, behavioral rules around sex, what breaks composure, what they will/will not initiate.
+
+  <== World Context ==>             ← include if source has world/lore/background data
+  Setting, current situation, relevant history that {{char}} carries into every scene.
+
+  <== Behavioral Rules ==>          ← include if source has explicit behavioral constraints
+  What {{char}} always does, never does, or does only under specific conditions.
+
+TARGET: 900–1400 words. Do not stop early.
 RULES: use {{char}} — never the literal name. Use {{user}} for the user.""",
 
     'personality': """\
@@ -301,7 +322,13 @@ def build_field_prompt(
 
     user_parts = [f"Character name: {project.character_name or project.name}"]
     for card in sorted(cards, key=lambda c: c.order_index):
-        if card.is_active:
+        if not card.is_active:
+            continue
+        # Include cards that explicitly target this field, or cards with no
+        # target (null) which are shared world/lore context for all fields.
+        # Cards targeting a *different* specific field are excluded — they are
+        # irrelevant to the current generation and only add noise.
+        if card.target_field is None or card.target_field == field_name:
             user_parts.append(f"=== {card.title} ===\n{card.content}")
     user_parts.append(
         f"Generate ONLY the '{field_name}' field. "
