@@ -76,7 +76,7 @@ def _write_env():
     image. On the next start pydantic-settings loads it as an override on top
     of any environment variables passed by Docker / Portainer.
     """
-    import os
+    import os, json as _json
     os.makedirs("data", exist_ok=True)
     lines = [
         f"OPENROUTER_API_KEY={settings.openrouter_api_key}",
@@ -88,9 +88,11 @@ def _write_env():
         f"MAX_TOKENS={settings.max_tokens}",
         f"TEMPERATURE={settings.temperature}",
         f"TOP_P={settings.top_p}",
+        f"REPETITION_PENALTY={settings.repetition_penalty}",
+        f"FIELD_MAX_TOKENS_JSON={settings.field_max_tokens_json}",
     ]
     try:
-        with open("data/.env", "w") as f:
+        with open("data/.env", "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
     except Exception:
         pass
