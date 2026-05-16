@@ -11,7 +11,7 @@ import { useProjectStore } from '../store/useProjectStore'
 import { Button } from '../components/ui/Button'
 import { CardPreview } from '../components/card-output/CardPreview'
 import { QualityChecklist } from '../components/card-output/QualityChecklist'
-import { validate_card_client } from '../utils/validators'
+import { validate_card_client, patchCardClient } from '../utils/validators'
 import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
 
@@ -59,8 +59,18 @@ export default function Output() {
       if (ok && card) {
         setGeneratedCard(card)
       } else {
-        setJsonText(currentProject.last_generated_card)
-        setJsonErrors(errors)
+        // Try cheap client-side patch before giving up
+        const { patched, remainingErrors, didPatch } = patchCardClient(currentProject.last_generated_card)
+        if (remainingErrors.length === 0) {
+          const { card: fixed } = validate_card_client(patched)
+          if (fixed) {
+            setGeneratedCard(fixed)
+            if (didPatch) toast.success('Campos ausentes preenchidos automaticamente')
+            return
+          }
+        }
+        setJsonText(patched)
+        setJsonErrors(remainingErrors)
         setTab('json')
       }
     } else if (streamingText) {
@@ -68,8 +78,17 @@ export default function Output() {
       if (ok && card) {
         setGeneratedCard(card)
       } else {
-        setJsonText(streamingText)
-        setJsonErrors(errors)
+        const { patched, remainingErrors, didPatch } = patchCardClient(streamingText)
+        if (remainingErrors.length === 0) {
+          const { card: fixed } = validate_card_client(patched)
+          if (fixed) {
+            setGeneratedCard(fixed)
+            if (didPatch) toast.success('Campos ausentes preenchidos automaticamente')
+            return
+          }
+        }
+        setJsonText(patched)
+        setJsonErrors(remainingErrors)
         setTab('json')
       }
     }
@@ -116,10 +135,26 @@ export default function Output() {
 
   const handleFixWithAI = async () => {
     if (!jsonText || fixing) return
+
+    // Always try client-side patch first — free, instant, no tokens
+    const { patched, remainingErrors, didPatch } = patchCardClient(jsonText)
+    if (remainingErrors.length === 0) {
+      const { card } = validate_card_client(patched)
+      if (card) {
+        setGeneratedCard(card)
+        setJsonErrors([])
+        setJsonText(JSON.stringify(card, null, 2))
+        toast.success('Corrigido automaticamente!')
+        return
+      }
+    }
+
+    // Client-side couldn't resolve everything — send patched version + remaining errors to AI
+    // (patched already has all fixable fields filled in, so AI gets less to do)
     setFixing(true)
     let accumulated = ''
     try {
-      const result = await generationApi.fixCard(jsonText, jsonErrors, chunk => {
+      const result = await generationApi.fixCard(patched, remainingErrors, chunk => {
         accumulated += chunk
         setJsonText(accumulated)
       })
@@ -298,7 +333,7 @@ export default function Output() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <p className="text-xs text-yellow-400 font-medium mb-1">
-                        JSON com problemas — edite manualmente ou corrija com IA:
+                        JSON com problemas — edite manualmente ou clique para corrigir:
                       </p>
                       {jsonErrors.map((e, i) => (
                         <p key={i} className="text-xs text-red-400">• {e}</p>
@@ -316,7 +351,7 @@ export default function Output() {
                       ) : (
                         <Wand2 size={12} />
                       )}
-                      {fixing ? 'Corrigindo...' : 'Corrigir com IA'}
+                      {fixing ? 'Corrigindo...' : 'Corrigir'}
                     </button>
                   </div>
                 </div>

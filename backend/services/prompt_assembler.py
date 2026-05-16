@@ -156,7 +156,7 @@ OUTPUT FORMAT — return EXACTLY this JSON structure. No markdown fences. No tex
     "post_history_instructions": "",
     "alternate_greetings": [],
     "tags": [],
-    "creator": "",
+    "creator": "SillyTavern Author",
     "character_version": "1.0",
     "avatar": "none",
     "talkativeness": "0.5"
@@ -168,6 +168,7 @@ HARD RULES:
 - Always use {{user}} for the user — never a specific name.
 - alternate_greetings must be a valid JSON array of strings.
 - mes_example must begin with <START>.
+- "creator" MUST always be exactly "SillyTavern Author" — never empty, never omitted.
 
 ━━━ FIELD QUALITY STANDARDS ━━━
 

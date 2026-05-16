@@ -47,3 +47,75 @@ export function validate_card_client(jsonStr: string): {
 
   return { ok: errors.length === 0, card: errors.length === 0 ? data : null, errors }
 }
+
+// Static defaults for every metadata field — never requires AI to fix
+const PATCH_DEFAULTS: Record<string, unknown> = {
+  creator: 'SillyTavern Author',
+  creator_notes: '',
+  character_version: '1.0',
+  avatar: 'none',
+  talkativeness: '0.5',
+  tags: [],
+  alternate_greetings: [],
+}
+
+/**
+ * Attempts to fix predictable, cheap errors client-side without any API call.
+ * Fixes: missing metadata fields, wrong spec values, array type mismatches,
+ * mes_example missing <START>. Returns the patched JSON string and any
+ * remaining errors that genuinely require AI intervention.
+ */
+export function patchCardClient(jsonStr: string): {
+  patched: string
+  remainingErrors: string[]
+  didPatch: boolean
+} {
+  let data: any
+  try {
+    data = JSON.parse(extractJson(jsonStr))
+  } catch {
+    return { patched: jsonStr, remainingErrors: ['JSON inválido'], didPatch: false }
+  }
+
+  let changed = false
+
+  // Auto-wrap flat objects missing the chara_card_v2 envelope
+  if (!data.spec && data.name) {
+    data = { spec: 'chara_card_v2', spec_version: '2.0', data }
+    changed = true
+  }
+
+  if (data.spec !== 'chara_card_v2') { data.spec = 'chara_card_v2'; changed = true }
+  if (data.spec_version !== '2.0') { data.spec_version = '2.0'; changed = true }
+  if (!data.data) { data.data = {}; changed = true }
+
+  const d = data.data
+
+  // Inject any missing metadata fields with their known safe defaults
+  for (const [field, defaultValue] of Object.entries(PATCH_DEFAULTS)) {
+    if (!(field in d)) {
+      d[field] = defaultValue
+      changed = true
+    }
+  }
+
+  // Fix array type issues without destroying content
+  if (d.alternate_greetings != null && !Array.isArray(d.alternate_greetings)) {
+    d.alternate_greetings = [String(d.alternate_greetings)]
+    changed = true
+  }
+  if (d.tags != null && !Array.isArray(d.tags)) {
+    d.tags = []
+    changed = true
+  }
+
+  // Fix mes_example not starting with <START>
+  if (typeof d.mes_example === 'string' && d.mes_example.trim() && !d.mes_example.trim().startsWith('<START>')) {
+    d.mes_example = '<START>\n' + d.mes_example
+    changed = true
+  }
+
+  const patched = JSON.stringify(data, null, 2)
+  const { errors } = validate_card_client(patched)
+  return { patched, remainingErrors: errors, didPatch: changed }
+}

@@ -271,6 +271,7 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
     def gen():
         card_data: dict = {
             "name": project.character_name or project.name,
+            "creator": "SillyTavern Author",
             "creator_notes": "",
             "character_version": "1.0",
             "avatar": "none",
@@ -421,7 +422,7 @@ FORMATO DE OUTPUT OBRIGATÓRIO — retorne exatamente esta estrutura:
     "first_mes": "", "mes_example": "", "creator_notes": "",
     "system_prompt": "", "post_history_instructions": "",
     "alternate_greetings": [], "tags": [],
-    "creator": "", "character_version": "1.0", "avatar": "none", "talkativeness": "0.5"
+    "creator": "SillyTavern Author", "character_version": "1.0", "avatar": "none", "talkativeness": "0.5"
   }
 }
 
