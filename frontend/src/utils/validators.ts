@@ -104,6 +104,19 @@ export function patchCardClient(jsonStr: string): {
     d.alternate_greetings = [String(d.alternate_greetings)]
     changed = true
   }
+  // Unwrap double-encoded alternate_greetings: ["[\"g1\",\"g2\"]"] → ["g1","g2"]
+  if (Array.isArray(d.alternate_greetings)
+      && d.alternate_greetings.length === 1
+      && typeof d.alternate_greetings[0] === 'string'
+      && d.alternate_greetings[0].trim().startsWith('[')) {
+    try {
+      const inner = JSON.parse(d.alternate_greetings[0])
+      if (Array.isArray(inner)) {
+        d.alternate_greetings = inner
+        changed = true
+      }
+    } catch { /* not double-encoded, leave as-is */ }
+  }
   if (d.tags != null && !Array.isArray(d.tags)) {
     d.tags = []
     changed = true

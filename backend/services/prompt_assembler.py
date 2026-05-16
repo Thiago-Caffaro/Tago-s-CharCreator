@@ -47,16 +47,17 @@ Work through the checklist in order. Only skip a section if the source data cont
   <== Relationship with {{user}} ==>  [ALWAYS REQUIRED]
   Current dynamic, power balance, what {{char}} wants from {{user}} they have not said aloud. 3–5 sentences.
 
-  <== Likes & Dislikes ==>     [REQUIRED if source lists preferences, aversions, loves, or hates]
+  <== Likes & Dislikes ==>     [WRITE THIS SECTION IF SOURCE HAS ANY PREFERENCES — do not skip]
   Concrete and specific — not categories. "Hates honey" not "dislikes sweet things."
-  Cover all groups present in source: likes, dislikes, loves, hates.
+  Cover every group present in source: likes, dislikes, loves, hates. Use the source's exact details.
 
-  <== Special States ==>       [REQUIRED if source describes specific triggered states]
-  Format: Trigger → physical changes → behavioral shift → what does not change → how it ends.
-
-  <== Sexual Nature ==>        [REQUIRED for NSFW/adult cards]
+  <== Sexual Nature ==>        [REQUIRED for NSFW/adult cards — write before Special States]
   Primary drive. Explicit rules: what {{char}} will and will NOT initiate. What breaks their composure.
   How arousal manifests physically. Species-specific anatomy behavior if relevant.
+  Kinks ranked by intensity. What they suppress vs what escapes control.
+
+  <== Special States ==>       [REQUIRED if source describes specific triggered states]
+  Format: Trigger → physical changes → behavioral shift → what does not change → how it ends → aftermath.
 
   <== World Context ==>        [REQUIRED if source has setting, lore, or backstory]
   The world {{char}} inhabits and the history they carry. Keep to what directly shapes their current behavior.
@@ -120,16 +121,18 @@ Block 2 — Pre-Threshold / Tension:
   Desire or intensity surfacing. Physical tells of arousal or emotional strain. Restraint behaviors.
   Stops before any explicit act — the tension is unresolved. Minimum 150 words.
 
-Block 3 — Post-Threshold — THIS BLOCK MUST BE FULLY EXPLICIT:
-  This is not a fade-to-black. This is not tension. This is the scene after the line is crossed.
-  REQUIRED story beats, in order:
-    1. The moment composure breaks — what physical action triggers it
-    2. First physical contact — what {{char}} does and how their body responds
-    3. Escalation to sex — clothing removed or displaced, explicit anatomy described
-    4. The act itself — pace, sensation, involuntary sounds, fragmented dialogue
-    5. Climax — written in full, including species-specific biology if applicable
-    6. Immediate aftermath — one beat of what happens in the seconds after
-  Do NOT stop at step 2 or 3. Write through to step 6. Minimum 300 words.
+Block 3 — THIS IS A SEX SCENE. Not tension. Not emotional breakthrough. Sex.
+  {{char}} and {{user}} are having sex. That has already happened or is happening now.
+  Begin mid-action or at the moment clothing comes off. Do NOT spend this block building toward it.
+  REQUIRED beats, in order — do not skip any:
+    1. Composure gone — the specific physical moment it broke (grip, movement, sound)
+    2. Clothing displaced — what comes off, how urgently, whose hands
+    3. Explicit anatomy — describe arousal state in specific physical terms
+    4. Penetration or the primary sexual act — pace, angle, sensation, involuntary sounds
+    5. Escalation — dialogue fragments as coherence degrades, pace intensifying
+    6. Climax — written in full: contractions, release, species-specific biology if applicable
+    7. Immediate aftermath — weight settling, first silence, one line or gesture
+  Minimum 350 words. Every beat must be physically explicit, not implied.
 
 Non-human characters: include species-specific physical tells (ears, tail, scent, vocalizations) in every block.""",
 
@@ -163,7 +166,10 @@ No backstory. No plot. No adjectives.""",
     'alternate_greetings': """\
 You are writing the ALTERNATE_GREETINGS field of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY a valid JSON array of strings — no label, no preamble, no markdown fences.
-Example format: ["greeting one text here", "greeting two text here"]
+The array must be FLAT — each greeting is a separate string element.
+CORRECT:   ["greeting one full text", "greeting two full text", "greeting three full text"]
+INCORRECT: [["greeting one", "greeting two"]] — do NOT nest arrays inside arrays.
+INCORRECT: ["[\"greeting one\", \"greeting two\"]"] — do NOT JSON-encode the inner array as a string.
 
 Minimum 2 greetings, target 4. Each starts in a genuinely different situation from first_mes.
 Cover distinct tones:
@@ -175,7 +181,7 @@ Cover distinct tones:
 FORMAT — mandatory in every greeting:
   • **bold** (double asterisks) wraps ALL action and narration — no exceptions.
   • — (em-dash) opens ALL dialogue lines.
-  • NEVER use single asterisks (*like this*). That is italics and is forbidden.
+  • NEVER use single asterisks (*like this*). That is italics and is forbidden here.
   • Never speak for {{user}} or describe their reaction.""",
 
     'creator_notes': """\

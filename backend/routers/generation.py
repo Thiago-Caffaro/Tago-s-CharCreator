@@ -307,7 +307,22 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
                     raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
                 try:
                     parsed = _json.loads(raw)
-                    card_data[field] = parsed if isinstance(parsed, list) else [raw]
+                    if isinstance(parsed, list):
+                        # Unwrap double-encoded arrays: the model sometimes outputs
+                        # ["[\"g1\",\"g2\",\"g3\"]"] — a single-element list whose only
+                        # item is a JSON-encoded string of the real array. Detect and fix.
+                        if (len(parsed) == 1
+                                and isinstance(parsed[0], str)
+                                and parsed[0].strip().startswith("[")):
+                            try:
+                                inner = _json.loads(parsed[0])
+                                if isinstance(inner, list):
+                                    parsed = inner
+                            except Exception:
+                                pass
+                        card_data[field] = parsed
+                    else:
+                        card_data[field] = [raw]
                 except Exception:
                     card_data[field] = [raw] if field == 'alternate_greetings' else []
             else:
