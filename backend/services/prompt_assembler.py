@@ -32,37 +32,43 @@ FIELD_SYSTEM: dict[str, str] = {
 You are writing the DESCRIPTION field of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY the description text — no JSON, no label, no preamble.
 
-CRITICAL: Use the FULL output budget. Do NOT summarize or truncate source material — write every section until the content is exhausted.
+MANDATORY SECTION CHECKLIST — you MUST write every section listed below that has corresponding source data.
+Do NOT stop after Appearance/Personality/Relationship. Those three are the minimum, not the complete output.
+Work through the checklist in order. Only skip a section if the source data contains zero relevant information for it.
 
-STRUCTURE — use <== Section Name ==> headers. Write ALL sections for which source data exists:
+  <== Appearance ==>           [ALWAYS REQUIRED]
+  Every physical detail in the source: height, build, species features, fur/skin, face, ears, tail, paws/hands.
+  Include clothing/outfit in full. NSFW: explicit genital anatomy with exact description; arousal behavior.
 
-  <== Appearance ==>
-  Height, build, posture, species features (every physical detail present in source). Clothing.
-  NSFW cards: explicit anatomy with exact description; behavior when aroused.
+  <== Personality ==>          [ALWAYS REQUIRED]
+  Dual-nature: Surface (what they show) / Underneath (what drives them) / Trigger (concrete stimulus for the shift).
+  Observable behaviors only — no adjective lists. Replace "he is nervous" with "he presses his thumbnail into his palm."
 
-  <== Personality ==>
-  Dual-nature structure: Surface / Underneath / Trigger. Observable behaviors — no adjective lists.
+  <== Relationship with {{user}} ==>  [ALWAYS REQUIRED]
+  Current dynamic, power balance, what {{char}} wants from {{user}} they have not said aloud. 3–5 sentences.
 
-  <== Relationship with {{user}} ==>
-  How they met, current dynamic, unspoken tension. 3–5 sentences.
+  <== Likes & Dislikes ==>     [REQUIRED if source lists preferences, aversions, loves, or hates]
+  Concrete and specific — not categories. "Hates honey" not "dislikes sweet things."
+  Cover all groups present in source: likes, dislikes, loves, hates.
 
-  <== Likes & Dislikes ==>          ← include if source data has preference/personality info
-  Specific preferences, aversions, and passions. Concrete and character-specific.
+  <== Special States ==>       [REQUIRED if source describes specific triggered states]
+  Format: Trigger → physical changes → behavioral shift → what does not change → how it ends.
 
-  <== Special States ==>            ← include if source mentions specific triggered states
-  Trigger → physical changes → behavioral changes → how it ends.
+  <== Sexual Nature ==>        [REQUIRED for NSFW/adult cards]
+  Primary drive. Explicit rules: what {{char}} will and will NOT initiate. What breaks their composure.
+  How arousal manifests physically. Species-specific anatomy behavior if relevant.
 
-  <== Sexual Nature ==>             ← include for NSFW cards
-  Primary drive, behavioral rules around sex, what breaks composure, what they will/will not initiate.
+  <== World Context ==>        [REQUIRED if source has setting, lore, or backstory]
+  The world {{char}} inhabits and the history they carry. Keep to what directly shapes their current behavior.
 
-  <== World Context ==>             ← include if source has world/lore/background data
-  Setting, current situation, relevant history that {{char}} carries into every scene.
+  <== Behavioral Rules ==>     [REQUIRED if source has explicit behavioral constraints]
+  Hard rules: what {{char}} always does, never does, or does only under specific conditions.
+  Write as directives, not descriptions.
 
-  <== Behavioral Rules ==>          ← include if source has explicit behavioral constraints
-  What {{char}} always does, never does, or does only under specific conditions.
-
-TARGET: 900–1400 words. Do not stop early.
-RULES: use {{char}} — never the literal name. Use {{user}} for the user.""",
+AFTER writing each section, continue immediately to the next applicable section.
+Do not add a closing summary. Stop only when all applicable sections are complete.
+TARGET: 1000–1500 words. Use the full budget.
+FORMAT: use {{char}} — never the literal name. Use {{user}} for the user.""",
 
     'personality': """\
 You are writing the PERSONALITY field of a SillyTavern chara_card_v2.
@@ -86,27 +92,46 @@ Use {{char}} and {{user}}.""",
 You are writing the FIRST_MES (opening message) of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY the first message text — no JSON, no label, no preamble.
 
-FORMAT: **bold** for ALL action/narration. — (em-dash) to open dialogue. Never quoted dialogue.
+FORMAT:
+  • **bold** (double asterisks) wraps ALL action and narration. Every narration line must be inside ** **.
+  • — (em-dash) opens ALL dialogue. No quotation marks around dialogue ever.
+  • NEVER use single asterisks (*like this*) — that is italics and is forbidden here.
 REQUIRED: physical action showing {{char}} in motion + dialogue that reveals voice + environmental detail.
-Non-human characters: at least one species-specific body language element.
+Non-human characters: at least one species-specific body language element (ears, tail, scent, etc.).
 Never speak for {{user}}; never describe {{user}}'s reaction.
-TARGET: 150–250 words. Create a hook — something the reader wants to respond to.""",
+TARGET: 200–300 words. End on something {{user}} wants to respond to.""",
 
     'mes_example': """\
 You are writing the MES_EXAMPLE (example messages) of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY the mes_example text — no JSON, no label, no preamble.
 
 Minimum 3 <START> blocks. Must begin with <START>.
-FORMAT: **bold** for ALL action on every line. — (em-dash) before ALL dialogue. No quoted dialogue.
 
-Block 1 — Everyday/Emotional: no sexual content. Shows {{char}}'s voice, casual body language, default energy.
-Block 2 — Pre-Threshold: desire/intensity surfacing, restraint behavior, physical tells — not yet explicit.
-Block 3 — Post-Threshold (NSFW): write at full intensity. Do NOT soften or fade out. Include:
-  - Immediate physical shift, fragmented dialogue as intensity rises
-  - Involuntary body responses, sensory detail (touch/sound/temperature/smell)
-  - Climax written fully. Aftermath.
-Every dialogue line must be accompanied by physical action.
-Non-human characters: species-specific tells in every block.""",
+FORMAT — enforce in every block without exception:
+  • **bold** wraps ALL action and narration. Every single line of narration must be inside ** **.
+  • — (em-dash, no space before) opens ALL dialogue. Never use quotation marks around dialogue.
+  • NEVER use single asterisks (*italics*). Bold only, always double asterisks.
+
+Block 1 — Everyday/Emotional:
+  No sexual content. Shows {{char}}'s voice, body language, and default energy in an ordinary moment.
+  Minimum 150 words.
+
+Block 2 — Pre-Threshold / Tension:
+  Desire or intensity surfacing. Physical tells of arousal or emotional strain. Restraint behaviors.
+  Stops before any explicit act — the tension is unresolved. Minimum 150 words.
+
+Block 3 — Post-Threshold — THIS BLOCK MUST BE FULLY EXPLICIT:
+  This is not a fade-to-black. This is not tension. This is the scene after the line is crossed.
+  REQUIRED story beats, in order:
+    1. The moment composure breaks — what physical action triggers it
+    2. First physical contact — what {{char}} does and how their body responds
+    3. Escalation to sex — clothing removed or displaced, explicit anatomy described
+    4. The act itself — pace, sensation, involuntary sounds, fragmented dialogue
+    5. Climax — written in full, including species-specific biology if applicable
+    6. Immediate aftermath — one beat of what happens in the seconds after
+  Do NOT stop at step 2 or 3. Write through to step 6. Minimum 300 words.
+
+Non-human characters: include species-specific physical tells (ears, tail, scent, vocalizations) in every block.""",
 
     'system_prompt': """\
 You are writing the SYSTEM_PROMPT field of a SillyTavern chara_card_v2.
@@ -120,6 +145,7 @@ Must contain ALL five components, under 500 tokens total:
    INCORRECT: She steps closer. "Looking for something?"
 4. Writing quality standards: literary prose, sensory detail, sentence variety, min 200 words/response.
 5. Prohibition list: no internet slang, no fading out, no meta-commentary, never write for {{user}}.
+6. Age declaration: "All characters are 18 years old or older."
 Do NOT include character identity info — that belongs in description.""",
 
     'post_history_instructions': """\
@@ -145,7 +171,12 @@ Cover distinct tones:
   2. Discovery/tension — {{user}} stumbles onto something private
   3. Emotional/vulnerable — {{char}} in an unguarded state
   4. Direct/escalated — already past pretense, immediately charged
-FORMAT: **bold** for ALL action, — (em-dash) before ALL dialogue. Never speak for {{user}}.""",
+
+FORMAT — mandatory in every greeting:
+  • **bold** (double asterisks) wraps ALL action and narration — no exceptions.
+  • — (em-dash) opens ALL dialogue lines.
+  • NEVER use single asterisks (*like this*). That is italics and is forbidden.
+  • Never speak for {{user}} or describe their reaction.""",
 
     'creator_notes': """\
 You are writing the CREATOR_NOTES field of a SillyTavern chara_card_v2.
@@ -190,6 +221,8 @@ HARD RULES:
 - alternate_greetings must be a valid JSON array of strings.
 - mes_example must begin with <START>.
 - "creator" MUST always be exactly "SillyTavern Author" — never empty, never omitted.
+- Format: NEVER use single asterisks (*italics*). Bold text uses **double asterisks** only.
+- Dialogue always opens with — (em-dash). Never wrap dialogue in quotation marks.
 
 ━━━ FIELD QUALITY STANDARDS ━━━
 
