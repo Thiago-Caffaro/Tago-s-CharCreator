@@ -126,17 +126,24 @@ export default function GeneratingPage() {
         const doneIdx = result.indexOf('__DONE__\n')
         const jsonStr = doneIdx >= 0 ? result.slice(doneIdx + 9) : result
 
+        // Always persist the latest raw JSON so the Output page always shows
+        // the NEW generation — even if it has structural problems.
+        if (jsonStr.trim()) {
+          await updateProject(pid, { last_generated_card: jsonStr })
+        }
+
         const { ok, card } = validate_card_client(jsonStr)
         if (ok && card) {
           setGeneratedCard(card)
-          await updateProject(pid, { last_generated_card: jsonStr })
           setGenerationComplete(true)
           toast.success('Card gerado com sucesso!')
         } else {
-          toast.error('JSON com problemas — verifique o Output.')
-          // Mark any still-generating field as error
+          // Don't set generatedCard — Output will fall through to
+          // last_generated_card (the broken JSON we just saved) and open
+          // the JSON tab with error indicators + the AI fix button.
+          toast.error('JSON com problemas — corrija no Output.')
           CHUNKED_FIELDS.forEach(f => {
-            if (fieldStatuses[f] === 'generating') setFieldStatus(f, 'error')
+            if ((fieldStatuses[f] as string) === 'generating') setFieldStatus(f, 'error')
           })
           setGenerationComplete(true)
         }
