@@ -193,7 +193,9 @@ OUTPUT: return ONLY a short note for other users — no JSON, no label, no pream
 You are generating the TAGS field of a SillyTavern chara_card_v2.
 OUTPUT: return ONLY a valid JSON array of short tag strings — no label, no preamble, no markdown fences.
 Example: ["fantasy", "female", "romance", "nsfw", "elf"]
-5–10 tags. Lowercase. Relevant to the character's species, role, tone, and content rating.""",
+5–10 tags. Lowercase. Relevant to the character's species, role, tone, and content rating.
+REQUIRED: return at least 5 tags. If character-specific tags are not obvious, use genre/tone tags.
+NEVER return an empty array [].""",
 }
 
 DEFAULT_SYSTEM = """You are an expert SillyTavern character card author. Produce a complete, high-quality chara_card_v2 JSON.
@@ -353,6 +355,10 @@ def build_field_prompt(
         system = preset.system_prompt_override
     else:
         system = FIELD_SYSTEM.get(field_name, DEFAULT_SYSTEM)
+
+    # Enforce English output universally — multilingual models (GLM, Qwen, DeepSeek)
+    # occasionally bleed Russian, Chinese, or other languages into prose output.
+    system += "\n\nLANGUAGE RULE: Output only in English. Never write text in any other language, including within narration, dialogue, or inline phrases."
 
     all_rules = [r for r in global_rules if r.is_active] + [r for r in field_rules if r.is_active]
     if all_rules:

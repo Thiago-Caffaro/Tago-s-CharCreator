@@ -12,7 +12,46 @@ from ..models.field_preset import FieldPreset
 from ..services import prompt_assembler
 from ..services.anthropic_client import stream_message, count_tokens
 
+import re as _re
+
 router = APIRouter(prefix="/api/generate", tags=["generation"])
+
+
+def _dedup_sections(text: str) -> str:
+    """Collapse repeated <== Section Name ==> headers in description output.
+
+    Some models loop back mid-generation and restart a section they already
+    began writing.  This function detects when the same header appears more
+    than once and removes everything from the first occurrence up to (but not
+    including) the last occurrence, effectively keeping only the final
+    (usually cleaner) version of each repeated section.
+    """
+    header_re = _re.compile(r'(<==\s*[^=]+?\s*==>)', _re.IGNORECASE)
+    headers = list(header_re.finditer(text))
+    if len(headers) <= 1:
+        return text
+
+    # Group by normalised header key
+    groups: dict[str, list] = {}
+    for m in headers:
+        key = _re.sub(r'\s+', ' ', m.group().strip().lower())
+        groups.setdefault(key, []).append(m)
+
+    dupes = {k: v for k, v in groups.items() if len(v) > 1}
+    if not dupes:
+        return text
+
+    # Build deletion ranges: [first_start, last_start) for each dupe.
+    # Sort in reverse so splicing doesn't shift earlier positions.
+    deletions = sorted(
+        [(v[0].start(), v[-1].start()) for v in dupes.values()],
+        key=lambda x: x[0],
+        reverse=True,
+    )
+    for del_start, del_end in deletions:
+        text = text[:del_start] + text[del_end:]
+
+    return text.strip()
 
 
 class FullCardRequest(BaseModel):
@@ -326,7 +365,13 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
                 except Exception:
                     card_data[field] = [raw] if field == 'alternate_greetings' else []
             else:
-                card_data[field] = content.strip()
+                cleaned = content.strip()
+                # Description sometimes has a model loop-back: the model starts
+                # a section, restarts it from the header mid-generation, producing
+                # a duplicate.  Collapse to the last (cleaner) occurrence.
+                if field == 'description':
+                    cleaned = _dedup_sections(cleaned)
+                card_data[field] = cleaned
 
             yield "\n"
 
