@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Folder, Trash2, Edit2, User, Calendar } from 'lucide-react'
+import { Plus, Folder, Trash2, Edit2, User, Calendar, Upload, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProjectStore } from '../store/useProjectStore'
+import { projectsApi } from '../api/projects'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
@@ -16,6 +17,8 @@ export default function Dashboard() {
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [form, setForm] = useState({ name: '', character_name: '', description: '' })
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchProjects() }, [])
 
@@ -46,6 +49,39 @@ export default function Dashboard() {
     }
   }
 
+  const handleExport = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation()
+    try {
+      await projectsApi.exportProject(project.id, project.name)
+      toast.success('Projeto exportado!')
+    } catch {
+      toast.error('Erro ao exportar projeto')
+    }
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.project || !data.version) {
+        toast.error('Arquivo inválido — não é um export de projeto')
+        return
+      }
+      const project = await projectsApi.importProject(data)
+      await fetchProjects()
+      toast.success(`Projeto "${project.name}" importado!`)
+      navigate(`/editor/${project.id}`)
+    } catch {
+      toast.error('Erro ao importar projeto')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -55,9 +91,26 @@ export default function Dashboard() {
             {projects.length} projeto{projects.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus size={16} /> Novo Projeto
-        </Button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={importRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => importRef.current?.click()}
+            loading={importing}
+          >
+            <Upload size={14} /> Importar Projeto
+          </Button>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus size={16} /> Novo Projeto
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -92,6 +145,13 @@ export default function Dashboard() {
                   className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => e.stopPropagation()}
                 >
+                  <button
+                    title="Exportar projeto"
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+                    onClick={e => handleExport(e, project)}
+                  >
+                    <Download size={13} />
+                  </button>
                   <button
                     className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
                     onClick={() => navigate(`/editor/${project.id}`)}

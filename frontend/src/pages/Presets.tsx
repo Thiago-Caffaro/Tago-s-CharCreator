@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { Plus, Layers, Tag } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
+import { Plus, Layers, Tag, Download, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { presetsApi } from '../api/presets'
 import { cardTypesApi } from '../api/cardTypes'
@@ -48,6 +48,8 @@ function PresetsTab() {
     is_default: false,
   })
   const [saving, setSaving] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
     try {
@@ -58,6 +60,37 @@ function PresetsTab() {
   }
 
   useEffect(() => { load() }, [])
+
+  const handleExportPresets = async () => {
+    try {
+      await presetsApi.exportPresets()
+      toast.success('Presets exportados!')
+    } catch {
+      toast.error('Erro ao exportar presets')
+    }
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.presets || !data.version) {
+        toast.error('Arquivo inválido — não é um export de presets')
+        return
+      }
+      const result = await presetsApi.importPresets(data)
+      await load()
+      toast.success(`${result.imported} preset(s) importado(s)!`)
+    } catch {
+      toast.error('Erro ao importar presets')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const filtered = fieldFilter
     ? presets.filter(p => p.target_field === fieldFilter)
@@ -125,7 +158,25 @@ function PresetsTab() {
           <span className="text-xs text-gray-600">
             {filtered.length} preset{filtered.length !== 1 ? 's' : ''}
           </span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <Button variant="secondary" size="sm" onClick={handleExportPresets}>
+              <Download size={13} /> Exportar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => importRef.current?.click()}
+              loading={importing}
+            >
+              <Upload size={13} /> Importar
+            </Button>
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus size={13} /> Novo Preset
             </Button>

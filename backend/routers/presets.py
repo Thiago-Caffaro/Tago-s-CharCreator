@@ -25,6 +25,42 @@ def create_preset(data: FieldPresetCreate, session: Session = Depends(get_sessio
     return preset
 
 
+# Static routes must come before /{preset_id} to avoid the path param swallowing them.
+
+@router.get("/export")
+def export_presets(session: Session = Depends(get_session)):
+    """Export all presets as a portable JSON bundle."""
+    presets = session.exec(select(FieldPreset)).all()
+    return {
+        "version": "1.0",
+        "presets": [
+            {
+                "name": p.name,
+                "target_field": p.target_field,
+                "system_prompt_override": p.system_prompt_override,
+                "is_default": p.is_default,
+            }
+            for p in presets
+        ],
+    }
+
+
+@router.post("/import")
+def import_presets(data: dict, session: Session = Depends(get_session)):
+    """Import presets exported via /export. Always creates new records."""
+    created = 0
+    for p in data.get("presets", []):
+        session.add(FieldPreset(
+            name=p.get("name", "Imported Preset"),
+            target_field=p.get("target_field", "description"),
+            system_prompt_override=p.get("system_prompt_override", ""),
+            is_default=p.get("is_default", False),
+        ))
+        created += 1
+    session.commit()
+    return {"imported": created}
+
+
 @router.put("/{preset_id}", response_model=FieldPresetRead)
 def update_preset(preset_id: int, data: FieldPresetUpdate, session: Session = Depends(get_session)):
     preset = session.get(FieldPreset, preset_id)

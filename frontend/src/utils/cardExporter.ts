@@ -15,8 +15,8 @@ export function exportCard(card: CharaCardV2, characterName: string) {
  * (keyword "chara", value base64-encoded JSON). SillyTavern can import these
  * directly as character cards.
  *
- * If avatarDataUrl is provided it is used as the image; otherwise a 400×600
- * dark placeholder is generated on a canvas.
+ * The image always goes through a canvas step so the output is guaranteed to be
+ * a valid PNG regardless of whether the user uploaded a JPEG, WebP, etc.
  */
 export async function exportCardAsPng(
   card: CharaCardV2,
@@ -27,13 +27,69 @@ export async function exportCardAsPng(
   // base64-encode the JSON (btoa chokes on non-latin chars → encode first)
   const b64Json = btoa(unescape(encodeURIComponent(jsonStr)))
 
-  const sourceBytes = avatarDataUrl
-    ? await dataUrlToBytes(avatarDataUrl)
-    : await generatePlaceholderPng(characterName)
-
-  const finalBytes = embedTextChunk(sourceBytes, 'chara', b64Json)
+  // Always render through canvas → guaranteed valid PNG output
+  const pngBytes = await renderToPng(avatarDataUrl, characterName)
+  const finalBytes = embedTextChunk(pngBytes, 'chara', b64Json)
   const blob = new Blob([finalBytes.buffer as ArrayBuffer], { type: 'image/png' })
   triggerDownload(blob, `${characterName || 'character'}_card.png`)
+}
+
+// ─── Canvas rendering ────────────────────────────────────────────────────────
+
+/**
+ * Draws any image dataUrl (or a placeholder) to a 400×600 canvas and returns
+ * the result as PNG bytes.  This guarantees the output is always a valid PNG
+ * even when the source is a JPEG, WebP, or any other format.
+ */
+function renderToPng(dataUrl: string | null, name: string): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 400
+    canvas.height = 600
+    const ctx = canvas.getContext('2d')!
+
+    const finish = () => {
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Canvas toBlob failed')); return }
+        blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf)))
+      }, 'image/png')
+    }
+
+    if (dataUrl) {
+      const img = new Image()
+      img.onload = () => {
+        // Cover-fill: scale & centre the image inside 400×600
+        const scale = Math.max(400 / img.naturalWidth, 600 / img.naturalHeight)
+        const w = img.naturalWidth * scale
+        const h = img.naturalHeight * scale
+        ctx.drawImage(img, (400 - w) / 2, (600 - h) / 2, w, h)
+        finish()
+      }
+      img.onerror = () => {
+        // Fallback to placeholder if image fails to load
+        drawPlaceholder(ctx, name)
+        finish()
+      }
+      img.src = dataUrl
+    } else {
+      drawPlaceholder(ctx, name)
+      finish()
+    }
+  })
+}
+
+function drawPlaceholder(ctx: CanvasRenderingContext2D, name: string) {
+  const grad = ctx.createLinearGradient(0, 0, 0, 600)
+  grad.addColorStop(0, '#1a1a2e')
+  grad.addColorStop(1, '#16213e')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, 400, 600)
+  const initials = (name || '?').slice(0, 2).toUpperCase()
+  ctx.fillStyle = '#9b59b6'
+  ctx.font = 'bold 120px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(initials, 200, 300)
 }
 
 // ─── PNG chunk helpers ────────────────────────────────────────────────────────
@@ -92,40 +148,9 @@ function crc32(buf: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0
 }
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+// ─── Generic download ────────────────────────────────────────────────────────
 
-async function dataUrlToBytes(dataUrl: string): Promise<Uint8Array> {
-  const res = await fetch(dataUrl)
-  return new Uint8Array(await res.arrayBuffer())
-}
-
-/** Generates a 400×600 dark placeholder PNG with character initials. */
-function generatePlaceholderPng(name: string): Promise<Uint8Array> {
-  return new Promise(resolve => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 400
-    canvas.height = 600
-    const ctx = canvas.getContext('2d')!
-    // Background gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, 600)
-    grad.addColorStop(0, '#1a1a2e')
-    grad.addColorStop(1, '#16213e')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, 400, 600)
-    // Initials
-    const initials = (name || '?').slice(0, 2).toUpperCase()
-    ctx.fillStyle = '#9b59b6'
-    ctx.font = 'bold 120px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(initials, 200, 300)
-    canvas.toBlob(blob => {
-      blob!.arrayBuffer().then(buf => resolve(new Uint8Array(buf)))
-    }, 'image/png')
-  })
-}
-
-function triggerDownload(blob: Blob, filename: string) {
+export function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

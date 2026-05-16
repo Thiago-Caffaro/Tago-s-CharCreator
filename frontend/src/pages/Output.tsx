@@ -20,7 +20,7 @@ type Tab = 'preview' | 'json' | 'checklist'
 export default function Output() {
   const { projectId } = useParams<{ projectId: string }>()
   const { generatedCard, streamingText, setGeneratedCard } = useGenerationStore()
-  const { currentProject, updateProject } = useProjectStore()
+  const { currentProject, updateProject, fetchProject } = useProjectStore()
 
   const [tab, setTab] = useState<Tab>('preview')
   const [jsonText, setJsonText] = useState('')
@@ -31,6 +31,13 @@ export default function Output() {
   const [exportOpen, setExportOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // Ensure the project is loaded even when navigating directly to this URL
+  useEffect(() => {
+    if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
+      fetchProject(Number(projectId))
+    }
+  }, [projectId])
 
   // Close export dropdown on outside click
   useEffect(() => {
