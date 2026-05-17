@@ -5,7 +5,7 @@ import type { AppSettings } from '../types'
 interface SettingsStore {
   settings: AppSettings | null
   fetchSettings: () => Promise<void>
-  updateSettings: (data: Partial<AppSettings> & { openrouter_api_key?: string }) => Promise<void>
+  updateSettings: (data: Partial<AppSettings> & { openrouter_api_key?: string; kie_ai_api_key?: string }) => Promise<void>
 }
 
 export const useSettingsStore = create<SettingsStore>(set => ({

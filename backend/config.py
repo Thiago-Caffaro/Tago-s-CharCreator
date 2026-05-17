@@ -5,6 +5,7 @@ from typing import List
 class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    kie_ai_api_key: str = ""
     database_url: str = "sqlite:///./data/tagosCharCreator.db"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     default_model: str = "anthropic/claude-sonnet-4-5"

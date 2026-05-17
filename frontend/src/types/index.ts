@@ -71,6 +71,7 @@ export interface LorebookEntry {
 
 export interface AppSettings {
   api_key_masked: string
+  kie_ai_key_masked: string
   default_model: string
   preferred_provider: string
   max_tokens: number

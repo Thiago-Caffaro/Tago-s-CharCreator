@@ -4,6 +4,8 @@ from .generation_rule import GenerationRule, RuleScope
 from .field_preset import FieldPreset
 from .lorebook import LorebookEntry
 from .card_type_config import CardTypeConfig
+from .image_preset import ImagePreset, ImagePresetRead, ImagePresetCreate, ImagePresetUpdate
+from .generated_image import GeneratedImage, GeneratedImageRead, GeneratedImageCreate
 
 __all__ = [
     "Project",
@@ -14,4 +16,11 @@ __all__ = [
     "FieldPreset",
     "LorebookEntry",
     "CardTypeConfig",
+    "ImagePreset",
+    "ImagePresetRead",
+    "ImagePresetCreate",
+    "ImagePresetUpdate",
+    "GeneratedImage",
+    "GeneratedImageRead",
+    "GeneratedImageCreate",
 ]
