@@ -4,8 +4,8 @@ import { imagePresetsApi, projectImagesApi, kieApi } from '../api/images'
 import type { GeneratedImage, ImagePreset, GenerateImageRequest } from '../api/images'
 
 export const OPENROUTER_FLUX_MODELS = [
-  { id: 'black-forest-labs/flux-2-pro', label: 'FLUX 2 Pro' },
-  { id: 'black-forest-labs/flux-2-pro-ultra', label: 'FLUX 2 Pro Ultra (supports img ref)' },
+  { id: 'black-forest-labs/flux.2-pro', label: 'FLUX 2 Pro' },
+  { id: 'black-forest-labs/flux.2-pro-ultra', label: 'FLUX 2 Pro Ultra (supports img ref)' },
   { id: 'black-forest-labs/flux-schnell', label: 'FLUX Schnell — fast, cheap' },
   { id: 'black-forest-labs/flux-dev', label: 'FLUX Dev' },
   { id: 'black-forest-labs/flux-1.1-pro', label: 'FLUX 1.1 Pro' },
@@ -24,7 +24,7 @@ export const KIE_MODELS = [
 export const KIE_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9']
 
 const OPENROUTER_ULTRA_MODELS = new Set([
-  'black-forest-labs/flux-2-pro-ultra',
+  'black-forest-labs/flux.2-pro-ultra',
   'black-forest-labs/flux-1.1-pro-ultra',
 ])
 

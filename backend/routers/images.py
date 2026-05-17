@@ -1,11 +1,15 @@
 import os
 import secrets
 import time
+import logging
+import traceback
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select, col
+
+logger = logging.getLogger(__name__)
 
 from ..database import engine
 from ..models.image_preset import ImagePreset, ImagePresetRead, ImagePresetCreate, ImagePresetUpdate
@@ -144,6 +148,7 @@ def generate_image(
                 image_url=req.image_ref_b64,
             )
     except Exception as exc:
+        logger.error("Image generation failed:\n%s", traceback.format_exc())
         raise HTTPException(502, f"Image generation failed: {exc}") from exc
 
     # Save to disk
