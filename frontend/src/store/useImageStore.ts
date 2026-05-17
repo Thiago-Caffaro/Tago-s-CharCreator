@@ -13,12 +13,11 @@ export const OPENROUTER_FLUX_MODELS = [
 ]
 
 export const KIE_MODELS = [
-  { id: 'flux-kontext-pro', label: 'FLUX Kontext Pro' },
-  { id: 'flux-kontext-max', label: 'FLUX Kontext Max' },
-  { id: 'flux-2-pro', label: 'FLUX 2 Pro' },
-  { id: 'flux-2-flex', label: 'FLUX 2 Flex' },
-  { id: 'flux-2-dev', label: 'FLUX 2 Dev' },
-  { id: 'gpt4o-image', label: 'GPT-4o Image' },
+  { id: 'flux-kontext-pro', label: 'FLUX Kontext Pro',  sfwOnly: false },
+  { id: 'flux-kontext-max', label: 'FLUX Kontext Max',  sfwOnly: false },
+  { id: 'flux-2-pro',       label: 'FLUX 2 Pro',        sfwOnly: true  },
+  { id: 'flux-2-flex',      label: 'FLUX 2 Flex',       sfwOnly: true  },
+  { id: 'gpt4o-image',      label: 'GPT-4o Image',      sfwOnly: true  },
 ]
 
 export const KIE_ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4', '21:9']
