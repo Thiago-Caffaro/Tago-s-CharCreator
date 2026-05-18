@@ -68,7 +68,12 @@ export const projectImagesApi = {
 
   generate: (projectId: number, req: GenerateImageRequest) =>
     client
-      .post<GeneratedImage>(`/projects/${projectId}/images/generate`, req, { timeout: 120_000 })
+      .post<GeneratedImage>(
+        `/projects/${projectId}/images/generate`,
+        req,
+        // Kie.ai jobs can take 3-5 min to poll to completion; OpenRouter is ~10-30s
+        { timeout: 360_000 },
+      )
       .then((r) => r.data),
 
   fileUrl: (imageId: number) => `/api/images/file/${imageId}`,
