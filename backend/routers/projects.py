@@ -1,4 +1,3 @@
-import shutil
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from datetime import datetime
@@ -8,7 +7,6 @@ from ..database import get_session
 from ..models.project import Project, ProjectCreate, ProjectRead, ProjectUpdate
 from ..models.context_card import ContextCard
 from ..models.lorebook import LorebookEntry
-from ..models.generated_image import GeneratedImage
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -61,11 +59,6 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
     entries = session.exec(select(LorebookEntry).where(LorebookEntry.project_id == project_id)).all()
     for entry in entries:
         session.delete(entry)
-    # cascade delete generated images (DB rows + files on disk)
-    images = session.exec(select(GeneratedImage).where(GeneratedImage.project_id == project_id)).all()
-    for img in images:
-        session.delete(img)
-    shutil.rmtree(f"data/images/{project_id}", ignore_errors=True)
     session.delete(project)
     session.commit()
 

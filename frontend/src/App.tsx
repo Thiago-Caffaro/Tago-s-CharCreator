@@ -9,7 +9,6 @@ import GeneratingPage from './pages/GeneratingPage'
 import Lorebook from './pages/Lorebook'
 import Settings from './pages/Settings'
 import Presets from './pages/Presets'
-import ImageGenerator from './pages/ImageGenerator'
 
 export default function App() {
   return (
@@ -32,7 +31,6 @@ export default function App() {
           <Route path="/editor/:projectId/generating" element={<GeneratingPage />} />
           <Route path="/editor/:projectId/output" element={<Output />} />
           <Route path="/editor/:projectId/lorebook" element={<Lorebook />} />
-          <Route path="/editor/:projectId/images" element={<ImageGenerator />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/presets" element={<Presets />} />
           <Route path="*" element={<Navigate to="/" replace />} />

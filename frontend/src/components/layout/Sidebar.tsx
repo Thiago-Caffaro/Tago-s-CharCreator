@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
 import {
   LayoutDashboard, PenTool, BookOpen, Settings,
-  Layers, BookMarked, FileOutput, Image,
+  Layers, BookMarked, FileOutput,
 } from 'lucide-react'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
@@ -26,7 +26,7 @@ function ProjectNav({ projectId }: { projectId: string }) {
   return (
     <div
       className={`overflow-hidden transition-all duration-200 ease-out ${
-        visible ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
+        visible ? 'max-h-48 opacity-100 mt-1' : 'max-h-0 opacity-0'
       }`}
     >
       {/* Indented group with a thin left border as visual indicator */}
@@ -44,11 +44,6 @@ function ProjectNav({ projectId }: { projectId: string }) {
         <NavLink to={`/editor/${projectId}/lorebook`} className={navCls}>
           <BookOpen size={14} />
           Lorebook
-        </NavLink>
-
-        <NavLink to={`/editor/${projectId}/images`} className={navCls}>
-          <Image size={14} />
-          Imagens
         </NavLink>
       </div>
     </div>

@@ -298,7 +298,6 @@ export default function Settings() {
   const { settings, fetchSettings, updateSettings } = useSettingsStore()
   const [rules, setRules] = useState<GenerationRule[]>([])
   const [apiKey, setApiKey] = useState('')
-  const [kieApiKey, setKieApiKey] = useState('')
   const [model, setModel] = useState('')
   const [provider, setProvider] = useState('')
   const [maxTokens, setMaxTokens] = useState(8192)
@@ -330,7 +329,6 @@ export default function Settings() {
     try {
       await updateSettings({
         ...(apiKey ? { openrouter_api_key: apiKey } : {}),
-        ...(kieApiKey ? { kie_ai_api_key: kieApiKey } : {}),
         default_model: model,
         preferred_provider: provider,
         max_tokens: maxTokens,
@@ -338,7 +336,6 @@ export default function Settings() {
         field_max_tokens: fieldMaxTokens,
       })
       setApiKey('')
-      setKieApiKey('')
       toast.success('Configurações salvas!')
     } catch {
       toast.error('Erro ao salvar configurações')
@@ -441,45 +438,6 @@ export default function Settings() {
             onChange={e => setTemperature(Number(e.target.value))}
           />
         </div>
-
-        <Button loading={saving} onClick={handleSaveSettings}>Salvar</Button>
-      </section>
-
-      {/* ── Kie.ai ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-300 border-b border-[#2a2a2a] pb-2">
-          Kie.ai — Geração de Imagens
-        </h2>
-
-        <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
-          <div className="w-2 h-2 rounded-full bg-[#9b59b6] shrink-0" />
-          <p className="text-xs text-gray-500">
-            Kie.ai oferece modelos FLUX Kontext e FLUX 2 para geração de imagens NSFW.{' '}
-            <a
-              href="https://kie.ai/api-key"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[#9b59b6] hover:underline inline-flex items-center gap-0.5"
-            >
-              Obter chave <ExternalLink size={9} />
-            </a>
-          </p>
-        </div>
-
-        {settings && (
-          <p className="text-xs text-gray-600">
-            Chave atual:{' '}
-            <span className="font-mono text-gray-500">{settings.kie_ai_key_masked}</span>
-          </p>
-        )}
-
-        <Input
-          label="Nova API Key do Kie.ai (deixe vazio para manter)"
-          type="password"
-          placeholder="kie-..."
-          value={kieApiKey}
-          onChange={e => setKieApiKey(e.target.value)}
-        />
 
         <Button loading={saving} onClick={handleSaveSettings}>Salvar</Button>
       </section>

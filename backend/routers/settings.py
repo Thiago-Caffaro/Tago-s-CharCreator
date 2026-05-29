@@ -10,7 +10,6 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 class SettingsRead(BaseModel):
     api_key_masked: str
-    kie_ai_key_masked: str
     default_model: str
     preferred_provider: str
     max_tokens: int
@@ -21,7 +20,6 @@ class SettingsRead(BaseModel):
 
 class SettingsUpdate(BaseModel):
     openrouter_api_key: Optional[str] = None
-    kie_ai_api_key: Optional[str] = None
     default_model: Optional[str] = None
     preferred_provider: Optional[str] = None
     max_tokens: Optional[int] = None
@@ -40,7 +38,6 @@ def _mask_key(key: str) -> str:
 def get_settings():
     return SettingsRead(
         api_key_masked=_mask_key(settings.openrouter_api_key),
-        kie_ai_key_masked=_mask_key(settings.kie_ai_api_key),
         default_model=settings.default_model,
         preferred_provider=settings.preferred_provider,
         max_tokens=settings.max_tokens,
@@ -55,8 +52,6 @@ def update_settings(data: SettingsUpdate):
     import json as _json
     if data.openrouter_api_key is not None:
         settings.openrouter_api_key = data.openrouter_api_key
-    if data.kie_ai_api_key is not None:
-        settings.kie_ai_api_key = data.kie_ai_api_key
     if data.default_model is not None:
         settings.default_model = data.default_model
     if data.preferred_provider is not None:
@@ -85,7 +80,6 @@ def _write_env():
     os.makedirs("data", exist_ok=True)
     lines = [
         f"OPENROUTER_API_KEY={settings.openrouter_api_key}",
-        f"KIE_AI_API_KEY={settings.kie_ai_api_key}",
         f"OPENROUTER_BASE_URL={settings.openrouter_base_url}",
         f"DATABASE_URL={settings.database_url}",
         f"CORS_ORIGINS={settings.cors_origins}",

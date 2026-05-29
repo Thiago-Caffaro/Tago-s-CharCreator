@@ -6,8 +6,8 @@ from sqlmodel import Session, select
 from .config import settings
 from .database import create_db_and_tables, engine
 from .routers import projects, context_cards, rules, presets, lorebook, generation, settings as settings_router
-from .routers import card_types, images as images_router
-from .models import GenerationRule, RuleScope, FieldPreset, CardTypeConfig, ImagePreset
+from .routers import card_types
+from .models import GenerationRule, RuleScope, FieldPreset, CardTypeConfig
 
 BUILTIN_CARD_TYPES = [
     ("appearance",    "Aparência",        "#3498db", 0),
@@ -29,26 +29,6 @@ def _seed_rule(session: Session, name: str, content: str, scope: RuleScope,
         session.add(GenerationRule(
             name=name, content=content, scope=scope,
             is_active=is_active, order_index=order_index, target_field=target_field,
-        ))
-
-
-def _seed_image_preset(
-    session: Session,
-    name: str,
-    category: str,
-    prompt_prefix: str,
-    prompt_suffix: str,
-    negative_prompt: str,
-    order_index: int,
-):
-    exists = session.exec(select(ImagePreset).where(ImagePreset.name == name)).first()
-    if not exists:
-        session.add(ImagePreset(
-            name=name, category=category,
-            prompt_prefix=prompt_prefix,
-            prompt_suffix=prompt_suffix,
-            negative_prompt=negative_prompt,
-            order_index=order_index,
         ))
 
 
@@ -435,88 +415,6 @@ WRONG behavioral anchor (description — don't write this):
                  "Write 3+ <START> blocks using **bold** for all action and — em-dash before all dialogue.\n"
                  "Block 3 must be written at full explicit intensity — no fade-out.", False)
 
-    # ── Image Presets ───────────────────────────────────────────────────────
-    _seed_image_preset(session,
-        name="Anime — Standard",
-        category="anime",
-        order_index=0,
-        prompt_prefix="anime illustration, key visual, 2d, cel shading, sharp lineart, vibrant flat color fills, studio quality, production-level detail, dynamic lighting, authentic anime aesthetic",
-        prompt_suffix="highly detailed, crisp lines, professional color grading, cinematic composition, expressive facial features, clean background, trending on pixiv",
-        negative_prompt="3d render, photorealistic, realistic skin texture, subsurface scattering, hyperrealism, ai-generated look, midjourney style, overly smooth gradient skin, plastic skin, airbrushed, uncanny valley, western comic style, low quality, blurry, watermark, deformed hands, extra fingers, bad anatomy",
-    )
-    _seed_image_preset(session,
-        name="Anime — Explicit",
-        category="nsfw_anime",
-        order_index=1,
-        prompt_prefix="explicit nsfw, anime illustration, key visual, 2d, cel shading, sharp clean lineart, adult doujin quality, vibrant flat color fills, expressive arousal, anatomically detailed, uncensored, studio-grade rendering",
-        prompt_suffix="high detail on anatomy, fluid body language, convincing weight and contact, expressive face, visible arousal state, authentic doujin aesthetic, professional coloring",
-        negative_prompt="censored, mosaic, blurred genitals, sfw, fully clothed, 3d render, photorealistic, plastic skin, airbrushed, bad anatomy, deformed, extra limbs, floating limbs, low quality, blurry, watermark, poorly drawn face, disproportionate body",
-    )
-    _seed_image_preset(session,
-        name="Furry — Standard",
-        category="furry",
-        order_index=2,
-        prompt_prefix="furry art, anthropomorphic, detailed fur texture, individual hair strands visible, species-accurate anatomy, expressive ears, articulated tail, e621 artist quality, clean digital art",
-        prompt_suffix="fur depth and shading, believable musculature under fur, species-specific features prominent, dynamic pose, expressive face, detailed paw pads, accurate claw anatomy",
-        negative_prompt="feral, non-anthropomorphic, quadruped only, flat fur texture, plastic fur look, airbrushed, 3d render, photorealistic human skin, poorly defined species, deformed snout, bad ears, poorly drawn paws, extra limbs, blurry, low quality, watermark",
-    )
-    _seed_image_preset(session,
-        name="Furry — Explicit",
-        category="nsfw_furry",
-        order_index=3,
-        prompt_prefix="explicit nsfw furry, anthropomorphic, adult furry art, detailed fur texture, species-accurate anatomy, explicit genital detail, e621 explicit rating, anatomically correct species features, uncensored",
-        prompt_suffix="detailed fur with directional shading, explicit arousal state visible, species-specific sexual anatomy accurate, believable body contact and weight, expressive face showing genuine arousal, authentic yiff art quality",
-        negative_prompt="censored, mosaic, sfw, clothed, feral genitalia on anthro, flat fur, plastic look, 3d render, photorealistic, bad anatomy, deformed paws, poorly drawn snout, missing tail, low quality, blurry, watermark, extra limbs",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Latex & Leather",
-        category="fetish",
-        order_index=4,
-        prompt_prefix="latex outfit, skin-tight latex suit, high-gloss reflective material, patent leather, specular highlight on latex, body-conforming fit, detailed material shading",
-        prompt_suffix="realistic latex sheen, sharp specular highlights, visible body contours through material, professional fetish fashion aesthetic, dramatic lighting enhancing material gloss",
-        negative_prompt="matte fabric, dull surface, loose fit, no specularity, blurry material edges, low quality, watermark",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Size Difference",
-        category="fetish",
-        order_index=5,
-        prompt_prefix="size difference, macro micro, dramatic scale contrast between characters, one character significantly larger than the other, scale emphasis, perspective-accurate size portrayal",
-        prompt_suffix="scale reference visible, convincing perspective, clear size contrast, dynamic composition emphasizing scale difference, detailed at multiple scales",
-        negative_prompt="same-size characters, incorrect perspective, unrealistic scale, low quality, blurry, watermark",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Bondage",
-        category="fetish",
-        order_index=6,
-        prompt_prefix="rope bondage, shibari, restraints, bound wrists, bound ankles, detailed rope texture, knot detail, restrained pose, professional fetish art quality",
-        prompt_suffix="rope depth and shadow, authentic shibari pattern, visible rope tension, expressive subject face, dramatic lighting, detailed rope weave texture",
-        negative_prompt="poorly drawn rope, rope floating off body, incorrect rope tension, merged ropes, bad anatomy, low quality, watermark",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Breeding",
-        category="fetish",
-        order_index=7,
-        prompt_prefix="pregnancy, heavily pregnant belly, rounded abdomen, maternal form, breeding fantasy aesthetic, pronounced belly with navel detail, soft lighting on belly",
-        prompt_suffix="belly weight and gravity convincing, skin stretch detail, navel prominence, authentic belly shape, professional illustration quality",
-        negative_prompt="flat abdomen, incorrect belly shape, floating belly, bad anatomy, low quality, watermark",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Hyper",
-        category="fetish",
-        order_index=8,
-        prompt_prefix="hyper anatomy, exaggerated proportions, extreme body inflation, hyper-exaggerated features, surreal scale body parts, fetish exaggeration art, stylized extreme anatomy",
-        prompt_suffix="convincing volume and weight despite exaggeration, gravity-consistent mass, stylized but intentional, high quality illustration, professional hyper art quality",
-        negative_prompt="realistic proportions, normal anatomy, subtle, low quality, watermark",
-    )
-    _seed_image_preset(session,
-        name="Fetish — Transformation",
-        category="fetish",
-        order_index=9,
-        prompt_prefix="mid-transformation, body transformation sequence, partial anthro transformation, species shift, transformation fetish art, visible transformation stage, hybrid between forms",
-        prompt_suffix="transformation stage clearly depicted, dual-nature features visible, professional TF art quality, expressive reaction to transformation, detailed transitional anatomy",
-        negative_prompt="fully human, fully animal, no transformation visible, complete form only, low quality, watermark",
-    )
-
     # ── Built-in Card Types ─────────────────────────────────────────────────
     for slug, label, color, order in BUILTIN_CARD_TYPES:
         existing = session.exec(select(CardTypeConfig).where(CardTypeConfig.slug == slug)).first()
@@ -555,7 +453,6 @@ app.include_router(lorebook.router)
 app.include_router(generation.router)
 app.include_router(settings_router.router)
 app.include_router(card_types.router)
-app.include_router(images_router.router)
 
 
 @app.get("/api/health")
