@@ -7,9 +7,9 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     database_url: str = "sqlite:///./data/tagosCharCreator.db"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
-    default_model: str = "anthropic/claude-sonnet-4-5"
+    default_model: str = "atlascloud/glm-4"
     preferred_provider: str = ""
-    max_tokens: int = 8192
+    max_tokens: int = 32768
     temperature: float = 1.0
     top_p: float = 0.999
     repetition_penalty: float = 1.05   # slight penalty prevents early self-truncation
@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     # Per-field output token budgets for chunked full-card generation.
     # Stored as a JSON string so pydantic-settings can load it from the .env file.
     field_max_tokens_json: str = (
-        '{"description":4096,"personality":2048,"scenario":1024,'
-        '"first_mes":3000,"mes_example":8192,'
-        '"system_prompt":3000,"post_history_instructions":1024,'
-        '"alternate_greetings":6000}'
+        '{"description":12288,"personality":6144,"scenario":4096,'
+        '"first_mes":9216,"mes_example":24576,'
+        '"system_prompt":9216,"post_history_instructions":4096,'
+        '"alternate_greetings":18432}'
     )
 
     @property

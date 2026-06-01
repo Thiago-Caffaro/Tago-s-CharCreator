@@ -1,25 +1,33 @@
 import React from 'react'
 import { Outlet } from 'react-router-dom'
+import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { BottomNav } from './BottomNav'
 
 export function Layout() {
   return (
     <div
-      className="flex flex-col bg-[#0f0f0f] text-gray-100 font-sans overflow-hidden"
+      className="flex bg-[#0f0f0f] text-gray-100 font-sans overflow-hidden"
       style={{ height: '100dvh' }}
     >
-      <Header />
+      {/* ── Desktop sidebar (hidden on mobile/tablet) ── */}
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
 
-      {/* Main content — leave room for bottom nav */}
-      <main
-        className="flex-1 overflow-auto"
-        style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 0px))' }}
-      >
-        <Outlet />
-      </main>
+      {/* ── Main column ── */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <Header />
 
-      <BottomNav />
+        <main className="flex-1 overflow-auto mobile-nav-pb">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* ── Mobile bottom nav (hidden on desktop) ── */}
+      <div className="lg:hidden">
+        <BottomNav />
+      </div>
     </div>
   )
 }

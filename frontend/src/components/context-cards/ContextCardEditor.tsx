@@ -11,6 +11,8 @@ interface Props {
   card: ContextCard | null
   onClose: () => void
   onSave: (cardId: number, data: Partial<ContextCard>) => Promise<void>
+  /** When true, renders as a 380px sidebar (desktop mode) */
+  desktop?: boolean
 }
 
 const CARD_TYPE_OPTIONS = Object.entries(CARD_TYPE_LABELS).map(([value, label]) => ({ value, label }))
@@ -19,7 +21,7 @@ const FIELD_OPTIONS = [
   ...CHARA_FIELDS.map(f => ({ value: f, label: f })),
 ]
 
-export function ContextCardEditor({ card, onClose, onSave }: Props) {
+export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
   const [title, setTitle] = useState('')
   const [cardType, setCardType] = useState<CardType>('custom')
   const [content, setContent] = useState('')
@@ -45,61 +47,56 @@ export function ContextCardEditor({ card, onClose, onSave }: Props) {
         content,
         target_field: targetField || undefined,
       })
-      onClose()
+      if (!desktop) onClose()
     } finally {
       setSaving(false)
     }
   }
 
+  // Desktop sidebar mode
+  if (desktop) {
+    if (!card) return null
+    return (
+      <aside className="w-[380px] bg-[#1a1a1a] border-l border-[#2a2a2a] flex flex-col shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
+          <span className="text-sm font-medium text-gray-200">Editar Card</span>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
+          <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value as CardType)} options={CARD_TYPE_OPTIONS} />
+          <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
+          <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={16} />
+        </div>
+        <div className="p-4 border-t border-[#2a2a2a] flex gap-2">
+          <Button variant="secondary" onClick={onClose} className="flex-1">Fechar</Button>
+          <Button loading={saving} onClick={handleSave} className="flex-1">Salvar</Button>
+        </div>
+      </aside>
+    )
+  }
+
+  // Mobile: full-screen overlay
   if (!card) return null
 
   return (
-    /* Full-screen overlay — slides over the editor */
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0f0f0f] overlay-up"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a] border-b border-[#2a2a2a] shrink-0">
-        <button
-          onClick={onClose}
-          className="flex items-center justify-center w-9 h-9 rounded-xl
-            text-gray-400 active:bg-[#242424] transition-colors"
-        >
+        <button onClick={onClose} className="flex items-center justify-center w-9 h-9 rounded-xl
+          text-gray-400 active:bg-[#242424] transition-colors">
           <X size={20} />
         </button>
         <span className="text-sm font-semibold text-gray-200">Editar Card</span>
-        <Button size="sm" loading={saving} onClick={handleSave}>
-          Salvar
-        </Button>
+        <Button size="sm" loading={saving} onClick={handleSave}>Salvar</Button>
       </div>
-
-      {/* Form */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        <Input
-          label="Título"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="Nome do bloco..."
-        />
-        <Select
-          label="Tipo"
-          value={cardType}
-          onChange={e => setCardType(e.target.value as CardType)}
-          options={CARD_TYPE_OPTIONS}
-        />
-        <Select
-          label="Campo-alvo (opcional)"
-          value={targetField}
-          onChange={e => setTargetField(e.target.value)}
-          options={FIELD_OPTIONS}
-        />
-        <Textarea
-          label="Conteúdo"
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          placeholder="Descreva aqui as informações deste bloco de contexto..."
-          rows={14}
-        />
+        <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
+        <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value as CardType)} options={CARD_TYPE_OPTIONS} />
+        <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
+        <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={14} />
       </div>
     </div>
   )

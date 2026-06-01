@@ -16,6 +16,8 @@ import type { FieldPreset } from '../../types'
 
 interface Props {
   projectId: number
+  /** When true, renders as a 300px sidebar with a header label (desktop) */
+  desktop?: boolean
 }
 
 const FIELD_OPTIONS = CHARA_FIELDS.map(f => ({ value: f, label: f }))
@@ -25,7 +27,7 @@ const MODE_OPTIONS = [
   { value: 'refine', label: 'Refinar Campo' },
 ]
 
-export function GenerationPanel({ projectId }: Props) {
+export function GenerationPanel({ projectId, desktop }: Props) {
   const navigate = useNavigate()
   const {
     mode, selectedField, selectedPresetIds, selectedPresetId, streaming,
@@ -78,8 +80,8 @@ export function GenerationPanel({ projectId }: Props) {
     }
   }
 
-  return (
-    <div className="h-full overflow-auto p-4 space-y-4">
+  const inner = (
+    <div className="overflow-auto p-4 space-y-4 h-full">
       <Select
         label="Modo"
         value={mode}
@@ -149,4 +151,17 @@ export function GenerationPanel({ projectId }: Props) {
       {mode !== 'full' && <StreamingOutput />}
     </div>
   )
+
+  if (desktop) {
+    return (
+      <aside className="w-[300px] bg-[#1a1a1a] border-l border-[#2a2a2a] flex flex-col shrink-0 overflow-auto">
+        <div className="px-4 py-3 border-b border-[#2a2a2a] shrink-0">
+          <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Geração</span>
+        </div>
+        {inner}
+      </aside>
+    )
+  }
+
+  return inner
 }
