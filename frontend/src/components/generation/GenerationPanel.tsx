@@ -20,8 +20,8 @@ interface Props {
 
 const FIELD_OPTIONS = CHARA_FIELDS.map(f => ({ value: f, label: f }))
 const MODE_OPTIONS = [
-  { value: 'full', label: 'Card Completo' },
-  { value: 'field', label: 'Campo Específico' },
+  { value: 'full',   label: 'Card Completo' },
+  { value: 'field',  label: 'Campo Específico' },
   { value: 'refine', label: 'Refinar Campo' },
 ]
 
@@ -42,7 +42,6 @@ export function GenerationPanel({ projectId }: Props) {
     presetsApi.list().then(setPresets).catch(() => {})
   }, [])
 
-  // Field presets for single-select (field/refine mode)
   const fieldPresets = presets.filter(p => p.target_field === selectedField)
   const presetOptions = [
     { value: '', label: 'Sem preset' },
@@ -53,37 +52,22 @@ export function GenerationPanel({ projectId }: Props) {
     if (streaming) return
 
     if (mode === 'full') {
-      // Full-card generation hands off to a dedicated progress page.
-      // Clear previous field-level state, then navigate — GeneratingPage
-      // owns the API call and renders the per-field progress blocks.
       resetFieldProgress()
       setGeneratedCard(null)
       navigate(`/editor/${projectId}/generating`)
       return
     }
 
-    // Field / refine modes stay in the sidebar with the small streaming output.
     setStreaming(true)
     resetStreamingText()
     setCurrentField(null)
 
     try {
       if (mode === 'field') {
-        await generationApi.field(
-          projectId,
-          selectedField,
-          selectedPresetId ?? undefined,
-          appendStreamingText,
-        )
+        await generationApi.field(projectId, selectedField, selectedPresetId ?? undefined, appendStreamingText)
         toast.success(`Campo '${selectedField}' gerado!`)
       } else if (mode === 'refine') {
-        await generationApi.refine(
-          projectId,
-          selectedField,
-          refineContent,
-          refineInstruction,
-          appendStreamingText,
-        )
+        await generationApi.refine(projectId, selectedField, refineContent, refineInstruction, appendStreamingText)
         toast.success(`Campo '${selectedField}' refinado!`)
       }
     } catch (e: any) {
@@ -95,83 +79,74 @@ export function GenerationPanel({ projectId }: Props) {
   }
 
   return (
-    <aside className="w-[300px] bg-[#1a1a1a] border-l border-[#2a2a2a] flex flex-col shrink-0 overflow-auto">
-      <div className="px-4 py-3 border-b border-[#2a2a2a]">
-        <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">Geração</span>
-      </div>
+    <div className="h-full overflow-auto p-4 space-y-4">
+      <Select
+        label="Modo"
+        value={mode}
+        onChange={e => setMode(e.target.value as any)}
+        options={MODE_OPTIONS}
+      />
 
-      <div className="p-4 space-y-4 flex-1">
+      {(mode === 'field' || mode === 'refine') && (
         <Select
-          label="Modo"
-          value={mode}
-          onChange={e => setMode(e.target.value as any)}
-          options={MODE_OPTIONS}
+          label="Campo"
+          value={selectedField}
+          onChange={e => setSelectedField(e.target.value)}
+          options={FIELD_OPTIONS}
         />
+      )}
 
-        {(mode === 'field' || mode === 'refine') && (
-          <Select
-            label="Campo"
-            value={selectedField}
-            onChange={e => setSelectedField(e.target.value)}
-            options={FIELD_OPTIONS}
+      {mode === 'full' && (
+        <PresetMultiSelect
+          presets={presets}
+          selectedIds={selectedPresetIds}
+          onChange={setSelectedPresetIds}
+        />
+      )}
+
+      {mode === 'field' && (
+        <Select
+          label="Preset de Prompt"
+          value={selectedPresetId ? String(selectedPresetId) : ''}
+          onChange={e => setSelectedPresetId(e.target.value ? Number(e.target.value) : null)}
+          options={presetOptions}
+        />
+      )}
+
+      {mode === 'refine' && (
+        <>
+          <Textarea
+            label="Conteúdo atual do campo"
+            value={refineContent}
+            onChange={e => setRefineContent(e.target.value)}
+            placeholder="Cole o conteúdo atual aqui..."
+            rows={4}
           />
-        )}
-
-        {/* Full card mode: multi-select presets */}
-        {mode === 'full' && (
-          <PresetMultiSelect
-            presets={presets}
-            selectedIds={selectedPresetIds}
-            onChange={setSelectedPresetIds}
+          <Textarea
+            label="Instrução de refinamento"
+            value={refineInstruction}
+            onChange={e => setRefineInstruction(e.target.value)}
+            placeholder="ex: Torne mais poético, adicione mais detalhes físicos..."
+            rows={3}
           />
-        )}
+        </>
+      )}
 
-        {/* Field mode: single-select preset */}
-        {mode === 'field' && (
-          <Select
-            label="Preset de Prompt"
-            value={selectedPresetId ? String(selectedPresetId) : ''}
-            onChange={e => setSelectedPresetId(e.target.value ? Number(e.target.value) : null)}
-            options={presetOptions}
-          />
-        )}
+      <TokenCounter projectId={projectId} />
 
-        {mode === 'refine' && (
-          <>
-            <Textarea
-              label="Conteúdo atual do campo"
-              value={refineContent}
-              onChange={e => setRefineContent(e.target.value)}
-              placeholder="Cole o conteúdo atual aqui..."
-              rows={4}
-            />
-            <Textarea
-              label="Instrução de refinamento"
-              value={refineInstruction}
-              onChange={e => setRefineInstruction(e.target.value)}
-              placeholder="ex: Torne mais poético, adicione mais detalhes físicos..."
-              rows={3}
-            />
-          </>
-        )}
+      <Button
+        onClick={handleGenerate}
+        loading={mode !== 'full' && streaming}
+        disabled={mode !== 'full' && streaming}
+        className="w-full justify-center"
+        size="md"
+      >
+        {mode === 'full'   && <><Wand2 size={16} /> Gerar Card</>}
+        {mode === 'field'  && <><Sparkles size={16} /> Gerar Campo</>}
+        {mode === 'refine' && <><RefreshCw size={16} /> Refinar</>}
+      </Button>
 
-        <TokenCounter projectId={projectId} />
-
-        <Button
-          onClick={handleGenerate}
-          loading={mode !== 'full' && streaming}
-          disabled={mode !== 'full' && streaming}
-          className="w-full justify-center"
-          size="md"
-        >
-          {mode === 'full' && <><Wand2 size={15} /> Gerar Card</>}
-          {mode === 'field' && <><Sparkles size={15} /> Gerar Campo</>}
-          {mode === 'refine' && <><RefreshCw size={15} /> Refinar</>}
-        </Button>
-
-        {/* Streaming output shown for field/refine modes only */}
-        {mode !== 'full' && <StreamingOutput />}
-      </div>
-    </aside>
+      {mode !== 'full' && <StreamingOutput />}
+    </div>
   )
 }

@@ -6,6 +6,29 @@
   box-sizing: border-box;
 }
 
+/* Bottom sheet slide-up animation */
+@keyframes sheet-up {
+  from { transform: translateY(100%); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1;   }
+}
+.sheet-up {
+  animation: sheet-up 0.22s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Full-screen overlay slide-up */
+@keyframes overlay-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0);    }
+}
+.overlay-up {
+  animation: overlay-up 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Prevent pull-to-refresh on mobile */
+body {
+  overscroll-behavior-y: contain;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Folder, Trash2, Edit2, User, Calendar, Upload, Download } from 'lucide-react'
+import { Plus, Folder, Trash2, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProjectStore } from '../store/useProjectStore'
 import { projectsApi } from '../api/projects'
@@ -83,11 +83,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 max-w-2xl mx-auto">
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-semibold text-gray-100">Projetos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-lg font-semibold text-gray-100">Projetos</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
             {projects.length} projeto{projects.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -99,87 +101,107 @@ export default function Dashboard() {
             className="hidden"
             onChange={handleImportFile}
           />
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
             onClick={() => importRef.current?.click()}
-            loading={importing}
+            disabled={importing}
+            className="flex items-center justify-center w-10 h-10 rounded-xl border border-[#333]
+              bg-[#1e1e1e] text-gray-400 active:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+            title="Importar Projeto"
           >
-            <Upload size={14} /> Importar Projeto
-          </Button>
+            {importing
+              ? <span className="w-4 h-4 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+              : <Upload size={16} />
+            }
+          </button>
           <Button onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> Novo Projeto
+            <Plus size={16} /> Novo
           </Button>
         </div>
       </div>
 
+      {/* States */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <span className="w-6 h-6 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-20">
+          <span className="w-7 h-7 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Folder size={48} className="text-gray-700 mb-4" />
-          <p className="text-gray-400 text-sm">Nenhum projeto ainda</p>
-          <p className="text-gray-600 text-xs mt-1">Crie seu primeiro projeto para começar</p>
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center mb-4">
+            <Folder size={28} className="text-gray-600" />
+          </div>
+          <p className="text-gray-400 text-sm font-medium">Nenhum projeto ainda</p>
+          <p className="text-gray-600 text-xs mt-1 mb-5">Crie seu primeiro projeto para começar</p>
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus size={15} /> Criar Projeto
+          </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {projects.map(project => (
             <div
               key={project.id}
-              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 hover:border-[#9b59b6]/40 transition-colors cursor-pointer group"
+              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-4
+                active:bg-[#1e1e1e] transition-colors cursor-pointer"
               onClick={() => navigate(`/editor/${project.id}`)}
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3">
+                {/* Icon */}
+                <div className="w-10 h-10 rounded-xl bg-[#9b59b6]/15 border border-[#9b59b6]/20
+                  flex items-center justify-center shrink-0 mt-0.5">
+                  <Folder size={18} className="text-[#9b59b6]" />
+                </div>
+
+                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-semibold text-gray-100 truncate">{project.name}</h2>
                   {project.character_name && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <User size={11} className="text-[#9b59b6]" />
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <User size={10} className="text-[#9b59b6]" />
                       <span className="text-xs text-[#9b59b6]">{project.character_name}</span>
                     </div>
                   )}
+                  {project.description && (
+                    <p className="text-xs text-gray-600 line-clamp-1 mt-1">{project.description}</p>
+                  )}
+                  <div className="flex items-center gap-1 text-[10px] text-gray-700 mt-1.5">
+                    <Calendar size={9} />
+                    {new Date(project.updated_at).toLocaleDateString('pt-BR')}
+                  </div>
                 </div>
-                <div
-                  className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <button
-                    title="Exportar projeto"
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
-                    onClick={e => handleExport(e, project)}
-                  >
-                    <Download size={13} />
-                  </button>
-                  <button
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
-                    onClick={() => navigate(`/editor/${project.id}`)}
-                  >
-                    <Edit2 size={13} />
-                  </button>
-                  <button
-                    className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-colors"
-                    onClick={() => setConfirmDelete(project)}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+
+                {/* Chevron */}
+                <ChevronRight size={16} className="text-gray-700 shrink-0 mt-1" />
               </div>
 
-              {project.description && (
-                <p className="text-xs text-gray-500 line-clamp-2 mb-3">{project.description}</p>
-              )}
-
-              <div className="flex items-center gap-1 text-[11px] text-gray-600">
-                <Calendar size={10} />
-                {new Date(project.updated_at).toLocaleDateString('pt-BR')}
+              {/* Action row — always visible, no hover needed on mobile */}
+              <div
+                className="flex items-center gap-2 mt-3 pt-3 border-t border-[#2a2a2a]"
+                onClick={e => e.stopPropagation()}
+              >
+                <button
+                  onClick={e => handleExport(e, project)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
+                    bg-[#242424] border border-[#2a2a2a] text-xs text-gray-400
+                    active:bg-[#2a2a2a] transition-colors"
+                >
+                  <Download size={12} />
+                  Exportar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(project)}
+                  className="flex items-center justify-center w-10 h-9 rounded-xl
+                    bg-[#242424] border border-[#2a2a2a] text-gray-600
+                    active:bg-red-900/20 active:text-red-400 transition-colors"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
             </div>
           ))}
         </div>
       )}
 
+      {/* Create modal */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo Projeto">
         <div className="space-y-4">
           <Input
@@ -201,22 +223,29 @@ export default function Dashboard() {
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
           />
-          <div className="flex gap-2 justify-end pt-2">
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancelar</Button>
-            <Button loading={saving} onClick={handleCreate} disabled={!form.name.trim()}>
-              Criar Projeto
+          <div className="flex gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowCreate(false)} className="flex-1">
+              Cancelar
+            </Button>
+            <Button loading={saving} onClick={handleCreate} disabled={!form.name.trim()} className="flex-1">
+              Criar
             </Button>
           </div>
         </div>
       </Modal>
 
+      {/* Delete confirm modal */}
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Confirmar exclusão" size="sm">
-        <p className="text-sm text-gray-300 mb-4">
-          Deletar <strong>{confirmDelete?.name}</strong>? Todos os context cards e lorebook entries serão removidos.
+        <p className="text-sm text-gray-300 mb-5">
+          Deletar <strong className="text-white">{confirmDelete?.name}</strong>? Todos os cards e lorebook entries serão removidos.
         </p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => setConfirmDelete(null)}>Cancelar</Button>
-          <Button variant="danger" onClick={handleDelete}>Deletar</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleDelete} className="flex-1">
+            Deletar
+          </Button>
         </div>
       </Modal>
     </div>

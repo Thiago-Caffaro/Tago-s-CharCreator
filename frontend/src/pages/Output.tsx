@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Download, CheckSquare, Eye, Code, Wand2, Save,
-  ImagePlus, FileJson, ImageIcon, ChevronDown,
+  ImagePlus, FileJson, Image as ImageIcon,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Editor from '@monaco-editor/react'
 import { useGenerationStore } from '../store/useGenerationStore'
 import { useProjectStore } from '../store/useProjectStore'
 import { Button } from '../components/ui/Button'
+import { BottomSheet } from '../components/ui/BottomSheet'
 import { CardPreview } from '../components/card-output/CardPreview'
 import { QualityChecklist } from '../components/card-output/QualityChecklist'
 import { validate_card_client, patchCardClient } from '../utils/validators'
@@ -29,37 +30,23 @@ export default function Output() {
   const [saving, setSaving] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
-  const exportRef = useRef<HTMLDivElement>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
-  // Ensure the project is loaded even when navigating directly to this URL
   useEffect(() => {
     if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
       fetchProject(Number(projectId))
     }
   }, [projectId])
 
-  // Close export dropdown on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
-        setExportOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
   useEffect(() => {
     if (generatedCard) {
       setJsonText(JSON.stringify(generatedCard, null, 2))
       setJsonErrors([])
     } else if (currentProject?.last_generated_card) {
-      const { ok, card, errors } = validate_card_client(currentProject.last_generated_card)
+      const { ok, card } = validate_card_client(currentProject.last_generated_card)
       if (ok && card) {
         setGeneratedCard(card)
       } else {
-        // Try cheap client-side patch before giving up
         const { patched, remainingErrors, didPatch } = patchCardClient(currentProject.last_generated_card)
         if (remainingErrors.length === 0) {
           const { card: fixed } = validate_card_client(patched)
@@ -74,7 +61,7 @@ export default function Output() {
         setTab('json')
       }
     } else if (streamingText) {
-      const { ok, card, errors } = validate_card_client(streamingText)
+      const { ok, card } = validate_card_client(streamingText)
       if (ok && card) {
         setGeneratedCard(card)
       } else {
@@ -121,10 +108,7 @@ export default function Output() {
       const result = await generationApi.fixCheck(JSON.stringify(generatedCard), checkId)
       const clean = result.replace(/```(?:json)?\s*([\s\S]*?)\s*```/, '$1').trim()
       const patch = JSON.parse(clean)
-      const updated: typeof generatedCard = {
-        ...generatedCard,
-        data: { ...generatedCard.data, ...patch },
-      }
+      const updated = { ...generatedCard, data: { ...generatedCard.data, ...patch } }
       setGeneratedCard(updated)
       setJsonText(JSON.stringify(updated, null, 2))
       toast.success('Campo corrigido!')
@@ -135,8 +119,6 @@ export default function Output() {
 
   const handleFixWithAI = async () => {
     if (!jsonText || fixing) return
-
-    // Always try client-side patch first — free, instant, no tokens
     const { patched, remainingErrors, didPatch } = patchCardClient(jsonText)
     if (remainingErrors.length === 0) {
       const { card } = validate_card_client(patched)
@@ -148,9 +130,6 @@ export default function Output() {
         return
       }
     }
-
-    // Client-side couldn't resolve everything — send patched version + remaining errors to AI
-    // (patched already has all fixable fields filled in, so AI gets less to do)
     setFixing(true)
     let accumulated = ''
     try {
@@ -178,140 +157,88 @@ export default function Output() {
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      toast.error('Selecione um arquivo de imagem')
-      return
-    }
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return }
     const reader = new FileReader()
     reader.onload = ev => setAvatarDataUrl(ev.target?.result as string)
     reader.readAsDataURL(file)
-    // reset so same file can be re-selected
     e.target.value = ''
   }
 
-  const handleExportJson = () => {
-    if (!generatedCard) return
-    exportCard(generatedCard, currentProject?.character_name || 'character')
-    setExportOpen(false)
-  }
-
-  const handleExportPng = async () => {
-    if (!generatedCard) return
-    setExportOpen(false)
-    try {
-      await exportCardAsPng(generatedCard, avatarDataUrl, currentProject?.character_name || 'character')
-    } catch {
-      toast.error('Erro ao exportar PNG')
-    }
-  }
-
-  const charName = currentProject?.character_name || 'character'
   const hasContent = !!generatedCard || !!jsonText
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'preview', label: 'Preview', icon: Eye },
-    { id: 'json', label: 'JSON', icon: Code },
-    { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+    { id: 'preview',   label: 'Preview',   icon: Eye },
+    { id: 'json',      label: 'JSON',       icon: Code },
+    { id: 'checklist', label: 'Checklist',  icon: CheckSquare },
   ]
 
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Tab bar + actions ── */}
-      <div className="flex items-center gap-1 px-4 pt-3 border-b border-[#2a2a2a] shrink-0">
+      {/* Tab bar */}
+      <div className="flex items-center border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors border-b-2 -mb-px
-              ${tab === t.id ? 'text-[#9b59b6] border-[#9b59b6]' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium
+              border-b-2 transition-colors
+              ${tab === t.id
+                ? 'text-[#9b59b6] border-[#9b59b6]'
+                : 'text-gray-500 border-transparent'
+              }`}
           >
-            <t.icon size={12} />
+            <t.icon size={13} />
             {t.label}
           </button>
         ))}
 
-        <div className="ml-auto flex items-center gap-2 pb-1">
+        {/* Actions: avatar + save + export */}
+        <div className="flex items-center gap-1 px-2 pb-1 shrink-0">
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
-          {/* Avatar upload */}
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleAvatarUpload}
-          />
           <button
             onClick={() => avatarInputRef.current?.click()}
-            title={avatarDataUrl ? 'Trocar imagem do personagem' : 'Carregar imagem do personagem'}
-            className="relative flex items-center justify-center w-7 h-7 rounded-lg border border-[#333]
-              bg-[#242424] hover:border-[#555] transition-colors overflow-hidden shrink-0"
+            className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#333]
+              bg-[#242424] overflow-hidden"
+            title="Avatar"
           >
-            {avatarDataUrl ? (
-              <img src={avatarDataUrl} alt="avatar" className="w-full h-full object-cover" />
-            ) : (
-              <ImagePlus size={13} className="text-gray-500" />
-            )}
+            {avatarDataUrl
+              ? <img src={avatarDataUrl} alt="avatar" className="w-full h-full object-cover" />
+              : <ImagePlus size={13} className="text-gray-500" />
+            }
           </button>
 
-          {/* Save button */}
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
             onClick={handleSave}
-            loading={saving}
             disabled={saving || !hasContent}
+            className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#333]
+              bg-[#242424] text-gray-400 disabled:opacity-40 active:bg-[#2a2a2a]"
+            title="Salvar"
           >
-            <Save size={13} />
-            {saving ? 'Salvando…' : 'Salvar'}
-          </Button>
+            {saving
+              ? <span className="w-3 h-3 border border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+              : <Save size={13} />
+            }
+          </button>
 
-          {/* Export dropdown */}
-          <div ref={exportRef} className="relative">
-            <button
-              onClick={() => setExportOpen(o => !o)}
-              disabled={!generatedCard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                bg-[#242424] border border-[#333] text-gray-300
-                hover:border-[#555] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Download size={13} />
-              Exportar
-              <ChevronDown size={11} className={`text-gray-500 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {exportOpen && generatedCard && (
-              <div className="absolute right-0 mt-1 w-44 rounded-lg border border-[#333] bg-[#1e1e1e]
-                shadow-xl overflow-hidden z-50">
-                <button
-                  onClick={handleExportJson}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
-                    hover:bg-[#2a2a2a] transition-colors"
-                >
-                  <FileJson size={13} className="text-[#9b59b6]" />
-                  Download .json
-                </button>
-                <button
-                  onClick={handleExportPng}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
-                    hover:bg-[#2a2a2a] transition-colors border-t border-[#2a2a2a]"
-                >
-                  <ImageIcon size={13} className="text-[#9b59b6]" />
-                  <span className="flex-1 text-left">Download .png</span>
-                  {!avatarDataUrl && (
-                    <span className="text-[10px] text-gray-600 ml-1">placeholder</span>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => setExportOpen(true)}
+            disabled={!generatedCard}
+            className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#333]
+              bg-[#242424] text-gray-400 disabled:opacity-40 active:bg-[#2a2a2a]"
+            title="Exportar"
+          >
+            <Download size={13} />
+          </button>
         </div>
       </div>
 
-      {/* ── Content ── */}
+      {/* Content */}
       {!hasContent ? (
-        <div className="flex flex-col items-center justify-center flex-1 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 text-center px-6">
           <p className="text-gray-500 text-sm">Nenhum card gerado ainda</p>
-          <p className="text-gray-700 text-xs mt-1">Use o painel de Geração no Editor</p>
+          <p className="text-gray-700 text-xs mt-1">Use a aba Gerar no Editor</p>
         </div>
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col">
@@ -321,7 +248,7 @@ export default function Output() {
               : (
                 <div className="flex flex-col items-center justify-center flex-1 text-center">
                   <p className="text-gray-500 text-sm">Preview indisponível</p>
-                  <p className="text-gray-600 text-xs mt-1">O JSON tem erros — corrija na aba JSON</p>
+                  <p className="text-gray-600 text-xs mt-1">Corrija os erros na aba JSON</p>
                 </div>
               )
           )}
@@ -329,28 +256,25 @@ export default function Output() {
           {tab === 'json' && (
             <div className="flex flex-col h-full">
               {jsonErrors.length > 0 && (
-                <div className="px-4 py-2 bg-yellow-900/20 border-b border-yellow-900/40 shrink-0">
+                <div className="px-4 py-3 bg-yellow-900/20 border-b border-yellow-900/40 shrink-0">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className="text-xs text-yellow-400 font-medium mb-1">
-                        JSON com problemas — edite manualmente ou clique para corrigir:
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-yellow-400 font-medium mb-1">JSON com problemas:</p>
                       {jsonErrors.map((e, i) => (
-                        <p key={i} className="text-xs text-red-400">• {e}</p>
+                        <p key={i} className="text-xs text-red-400 truncate">• {e}</p>
                       ))}
                     </div>
                     <button
                       onClick={handleFixWithAI}
                       disabled={fixing}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                      className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium
                         bg-[#9b59b6]/20 text-[#9b59b6] border border-[#9b59b6]/30
-                        hover:bg-[#9b59b6]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        active:bg-[#9b59b6]/30 disabled:opacity-50 transition-colors"
                     >
-                      {fixing ? (
-                        <span className="w-3 h-3 border border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Wand2 size={12} />
-                      )}
+                      {fixing
+                        ? <span className="w-3 h-3 border border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+                        : <Wand2 size={12} />
+                      }
                       {fixing ? 'Corrigindo...' : 'Corrigir'}
                     </button>
                   </div>
@@ -363,7 +287,7 @@ export default function Output() {
                   theme="vs-dark"
                   value={jsonText}
                   onChange={handleJsonChange}
-                  options={{ fontSize: 12, minimap: { enabled: false }, wordWrap: 'on' }}
+                  options={{ fontSize: 13, minimap: { enabled: false }, wordWrap: 'on' }}
                 />
               </div>
             </div>
@@ -375,12 +299,46 @@ export default function Output() {
               : (
                 <div className="flex flex-col items-center justify-center flex-1 text-center">
                   <p className="text-gray-500 text-sm">Checklist indisponível</p>
-                  <p className="text-gray-600 text-xs mt-1">O JSON tem erros — corrija na aba JSON</p>
+                  <p className="text-gray-600 text-xs mt-1">Corrija os erros na aba JSON</p>
                 </div>
               )
           )}
         </div>
       )}
+
+      {/* Export bottom sheet */}
+      <BottomSheet open={exportOpen} onClose={() => setExportOpen(false)} title="Exportar Card">
+        <div className="px-3 py-3 space-y-2">
+          <button
+            onClick={() => { exportCard(generatedCard!, currentProject?.character_name || 'character'); setExportOpen(false) }}
+            className="flex items-center gap-4 w-full px-4 py-4 rounded-xl bg-[#242424] active:bg-[#2a2a2a]"
+          >
+            <FileJson size={20} className="text-[#9b59b6]" />
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-200">Download .json</p>
+              <p className="text-xs text-gray-500">Formato padrão SillyTavern</p>
+            </div>
+          </button>
+          <button
+            onClick={async () => {
+              setExportOpen(false)
+              try {
+                await exportCardAsPng(generatedCard!, avatarDataUrl, currentProject?.character_name || 'character')
+              } catch { toast.error('Erro ao exportar PNG') }
+            }}
+            className="flex items-center gap-4 w-full px-4 py-4 rounded-xl bg-[#242424] active:bg-[#2a2a2a]"
+          >
+            <ImageIcon size={20} className="text-[#9b59b6]" />
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-200">Download .png</p>
+              <p className="text-xs text-gray-500">
+                {avatarDataUrl ? 'Com avatar' : 'Sem avatar (placeholder)'}
+              </p>
+            </div>
+          </button>
+        </div>
+        <div className="h-2" />
+      </BottomSheet>
     </div>
   )
 }

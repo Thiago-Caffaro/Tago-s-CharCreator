@@ -39,12 +39,16 @@ export function EntryForm({ entry, onClose, onSave }: Props) {
   }
 
   return (
-    <aside className="w-[360px] bg-[#1a1a1a] border-l border-[#2a2a2a] flex flex-col shrink-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
-        <span className="text-sm font-medium text-gray-200">Editar Entry</span>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
-          <X size={16} />
+    /* Full-screen layout — parent (Lorebook.tsx) wraps this in a fixed overlay */
+    <div className="flex flex-col h-full bg-[#0f0f0f]">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a] border-b border-[#2a2a2a] shrink-0">
+        <button onClick={onClose} className="flex items-center justify-center w-9 h-9 rounded-xl
+          text-gray-400 active:bg-[#242424] transition-colors">
+          <X size={20} />
         </button>
+        <span className="text-sm font-semibold text-gray-200">Editar Entry</span>
+        <Button size="sm" loading={saving} onClick={handleSave}>Salvar</Button>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
@@ -74,7 +78,7 @@ export function EntryForm({ entry, onClose, onSave }: Props) {
           value={form.comment ?? ''}
           onChange={e => update('comment', e.target.value)}
         />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <Input
             label="Ordem de inserção"
             type="number"
@@ -94,17 +98,12 @@ export function EntryForm({ entry, onClose, onSave }: Props) {
             onChange={e => update('probability', Number(e.target.value))}
           />
         </div>
-        <div className="space-y-2">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 space-y-3">
           <Toggle label="Ativo" checked={form.enabled ?? true} onChange={v => update('enabled', v)} />
           <Toggle label="Constante" checked={form.constant ?? false} onChange={v => update('constant', v)} />
           <Toggle label="Seletivo" checked={form.selective ?? false} onChange={v => update('selective', v)} />
         </div>
       </div>
-
-      <div className="p-4 border-t border-[#2a2a2a] flex gap-2">
-        <Button variant="secondary" onClick={onClose} className="flex-1">Fechar</Button>
-        <Button loading={saving} onClick={handleSave} className="flex-1">Salvar</Button>
-      </div>
-    </aside>
+    </div>
   )
 }

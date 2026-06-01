@@ -35,9 +35,8 @@ export function ContextCardEditor({ card, onClose, onSave }: Props) {
     }
   }, [card])
 
-  if (!card) return null
-
   const handleSave = async () => {
+    if (!card) return
     setSaving(true)
     try {
       await onSave(card.id, {
@@ -46,20 +45,35 @@ export function ContextCardEditor({ card, onClose, onSave }: Props) {
         content,
         target_field: targetField || undefined,
       })
+      onClose()
     } finally {
       setSaving(false)
     }
   }
 
+  if (!card) return null
+
   return (
-    <aside className="w-[380px] bg-[#1a1a1a] border-l border-[#2a2a2a] flex flex-col shrink-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
-        <span className="text-sm font-medium text-gray-200">Editar Card</span>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
-          <X size={16} />
+    /* Full-screen overlay — slides over the editor */
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0f0f0f] overlay-up"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#1a1a1a] border-b border-[#2a2a2a] shrink-0">
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-9 h-9 rounded-xl
+            text-gray-400 active:bg-[#242424] transition-colors"
+        >
+          <X size={20} />
         </button>
+        <span className="text-sm font-semibold text-gray-200">Editar Card</span>
+        <Button size="sm" loading={saving} onClick={handleSave}>
+          Salvar
+        </Button>
       </div>
 
+      {/* Form */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
         <Input
           label="Título"
@@ -84,15 +98,9 @@ export function ContextCardEditor({ card, onClose, onSave }: Props) {
           value={content}
           onChange={e => setContent(e.target.value)}
           placeholder="Descreva aqui as informações deste bloco de contexto..."
-          rows={16}
-          className="flex-1"
+          rows={14}
         />
       </div>
-
-      <div className="p-4 border-t border-[#2a2a2a] flex gap-2">
-        <Button variant="secondary" onClick={onClose} className="flex-1">Fechar</Button>
-        <Button loading={saving} onClick={handleSave} className="flex-1">Salvar</Button>
-      </div>
-    </aside>
+    </div>
   )
 }
