@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Download, CheckSquare, Eye, Code, Wand2, Save,
-  ImagePlus, FileJson, Image as ImageIcon,
+  ImagePlus, FileJson, Image as ImageIcon, RefreshCw,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Editor from '@monaco-editor/react'
@@ -15,6 +15,25 @@ import { QualityChecklist } from '../components/card-output/QualityChecklist'
 import { validate_card_client, patchCardClient } from '../utils/validators'
 import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
+import { presetsApi } from '../api/presets'
+import type { FieldPreset } from '../types'
+import { CHARA_FIELDS } from '../types'
+
+const FIELD_LABELS: Record<string, string> = {
+  name:                       'Nome',
+  description:                'Descrição',
+  personality:                'Personalidade',
+  scenario:                   'Cenário',
+  first_mes:                  'Primeira Mensagem',
+  mes_example:                'Exemplos de Mensagem',
+  system_prompt:              'System Prompt',
+  post_history_instructions:  'Post-History Instructions',
+  creator_notes:              'Notas do Criador',
+  tags:                       'Tags',
+  talkativeness:              'Tagarelice',
+  character_version:          'Versão',
+  alternate_greetings:        'Saudações Alternativas',
+}
 
 type Tab = 'preview' | 'json' | 'checklist'
 
@@ -31,6 +50,69 @@ export default function Output() {
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Field regeneration state ────────────────────────────���─────────────────
+  const [presets, setPresets] = useState<FieldPreset[]>([])
+  const [regenField, setRegenField] = useState<string | null>(null)
+  const [regenPresetId, setRegenPresetId] = useState<string>('')
+  const [regenStreaming, setRegenStreaming] = useState(false)
+  const [regenText, setRegenText] = useState('')
+  const regenScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    presetsApi.list().then(setPresets).catch(() => {})
+  }, [])
+
+  // Auto-scroll streaming output
+  useEffect(() => {
+    if (regenScrollRef.current) {
+      regenScrollRef.current.scrollTop = regenScrollRef.current.scrollHeight
+    }
+  }, [regenText])
+
+  const openRegenSheet = (field: string) => {
+    setRegenField(field)
+    setRegenPresetId('')
+    setRegenText('')
+  }
+
+  const handleRegenerate = async () => {
+    if (!regenField || regenStreaming || !projectId) return
+    setRegenStreaming(true)
+    setRegenText('')
+    let accumulated = ''
+    try {
+      await generationApi.field(
+        Number(projectId),
+        regenField,
+        regenPresetId ? Number(regenPresetId) : undefined,
+        (chunk: string) => {
+          accumulated += chunk
+          setRegenText(accumulated)
+        },
+      )
+      // Parse and merge the new field into the existing card
+      if (generatedCard && accumulated.trim()) {
+        const updated = {
+          ...generatedCard,
+          data: {
+            ...generatedCard.data,
+            [regenField]: regenField === 'tags' || regenField === 'alternate_greetings'
+              ? (() => { try { return JSON.parse(accumulated.trim()) } catch { return accumulated.trim() } })()
+              : accumulated.trim(),
+          },
+        }
+        setGeneratedCard(updated)
+        setJsonText(JSON.stringify(updated, null, 2))
+        toast.success(`Campo "${FIELD_LABELS[regenField] ?? regenField}" regenerado!`)
+        setRegenField(null)
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erro na regeneração')
+    } finally {
+      setRegenStreaming(false)
+    }
+  }
 
   useEffect(() => {
     if (projectId && (!currentProject || currentProject.id !== Number(projectId))) {
@@ -244,7 +326,7 @@ export default function Output() {
         <div className="flex-1 overflow-hidden flex flex-col">
           {tab === 'preview' && (
             generatedCard
-              ? <CardPreview card={generatedCard} />
+              ? <CardPreview card={generatedCard} onRegenerateField={openRegenSheet} />
               : (
                 <div className="flex flex-col items-center justify-center flex-1 text-center">
                   <p className="text-gray-500 text-sm">Preview indisponível</p>
@@ -305,6 +387,79 @@ export default function Output() {
           )}
         </div>
       )}
+
+      {/* ── Field regeneration bottom sheet ── */}
+      <BottomSheet
+        open={!!regenField}
+        onClose={() => { if (!regenStreaming) setRegenField(null) }}
+        title={regenField ? `Refazer: ${FIELD_LABELS[regenField] ?? regenField}` : 'Refazer Campo'}
+      >
+        <div className="px-4 py-3 space-y-3">
+          {/* Preset selector */}
+          {(() => {
+            const fieldPresets = presets.filter(p => p.target_field === regenField)
+            if (fieldPresets.length > 0) {
+              return (
+                <div>
+                  <label className="text-xs font-medium text-gray-400 block mb-1.5">
+                    Preset de Prompt (opcional)
+                  </label>
+                  <select
+                    value={regenPresetId}
+                    onChange={e => setRegenPresetId(e.target.value)}
+                    className="w-full bg-[#242424] border border-[#333] text-gray-200 text-sm
+                      rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#9b59b6]"
+                    disabled={regenStreaming}
+                  >
+                    <option value="">Sem preset</option>
+                    {fieldPresets.map(p => (
+                      <option key={p.id} value={String(p.id)}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            }
+            return null
+          })()}
+
+          {/* Streaming output */}
+          {regenText && (
+            <div
+              ref={regenScrollRef}
+              className="bg-[#0f0f0f] rounded-xl p-3 max-h-48 overflow-auto border border-[#2a2a2a]"
+            >
+              <pre className="text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed">
+                {regenText}
+                {regenStreaming && <span className="text-[#9b59b6] animate-pulse">█</span>}
+              </pre>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button
+              onClick={() => setRegenField(null)}
+              disabled={regenStreaming}
+              className="flex-1 py-3 text-sm text-gray-400 bg-[#242424] rounded-xl
+                border border-[#333] active:bg-[#2a2a2a] disabled:opacity-40 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleRegenerate}
+              disabled={regenStreaming}
+              className="flex-1 py-3 text-sm bg-[#9b59b6] active:bg-[#8e44ad] text-white
+                rounded-xl font-semibold flex items-center justify-center gap-2
+                disabled:opacity-50 transition-colors"
+            >
+              {regenStreaming
+                ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Gerando...</>
+                : <><RefreshCw size={14} /> Gerar</>
+              }
+            </button>
+          </div>
+        </div>
+        <div className="h-2" />
+      </BottomSheet>
 
       {/* Export bottom sheet */}
       <BottomSheet open={exportOpen} onClose={() => setExportOpen(false)} title="Exportar Card">
