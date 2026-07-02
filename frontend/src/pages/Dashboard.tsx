@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Folder, Trash2, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
+import { Plus, Folder, Trash2, Edit2, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProjectStore } from '../store/useProjectStore'
 import { projectsApi } from '../api/projects'
@@ -83,13 +83,13 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 max-w-2xl mx-auto lg:p-6 lg:max-w-6xl">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 lg:mb-6">
         <div>
-          <h1 className="text-lg font-semibold text-gray-100">Projetos</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h1 className="text-lg lg:text-xl font-semibold text-gray-100">Projetos</h1>
+          <p className="text-xs lg:text-sm text-gray-500 mt-0.5">
             {projects.length} projeto{projects.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -101,10 +101,11 @@ export default function Dashboard() {
             className="hidden"
             onChange={handleImportFile}
           />
+          {/* Mobile: icon-only import button */}
           <button
             onClick={() => importRef.current?.click()}
             disabled={importing}
-            className="flex items-center justify-center w-10 h-10 rounded-xl border border-[#333]
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-xl border border-[#333]
               bg-[#1e1e1e] text-gray-400 active:bg-[#2a2a2a] transition-colors disabled:opacity-50"
             title="Importar Projeto"
           >
@@ -113,8 +114,20 @@ export default function Dashboard() {
               : <Upload size={16} />
             }
           </button>
+          {/* Desktop: labeled import button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => importRef.current?.click()}
+            loading={importing}
+            className="hidden lg:inline-flex"
+          >
+            <Upload size={14} /> Importar Projeto
+          </Button>
           <Button onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> Novo
+            <Plus size={16} />
+            <span className="lg:hidden">Novo</span>
+            <span className="hidden lg:inline">Novo Projeto</span>
           </Button>
         </div>
       </div>
@@ -136,7 +149,65 @@ export default function Dashboard() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <>
+        {/* Desktop grid */}
+        <div className="hidden lg:grid grid-cols-2 xl:grid-cols-3 gap-4">
+          {projects.map(project => (
+            <div
+              key={project.id}
+              className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 hover:border-[#9b59b6]/40 transition-colors cursor-pointer group"
+              onClick={() => navigate(`/editor/${project.id}`)}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-gray-100 truncate">{project.name}</h2>
+                  {project.character_name && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <User size={11} className="text-[#9b59b6]" />
+                      <span className="text-xs text-[#9b59b6]">{project.character_name}</span>
+                    </div>
+                  )}
+                </div>
+                <div
+                  className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <button
+                    title="Exportar projeto"
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+                    onClick={e => handleExport(e, project)}
+                  >
+                    <Download size={13} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+                    onClick={() => navigate(`/editor/${project.id}`)}
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                  <button
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-colors"
+                    onClick={() => setConfirmDelete(project)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+
+              {project.description && (
+                <p className="text-xs text-gray-500 line-clamp-2 mb-3">{project.description}</p>
+              )}
+
+              <div className="flex items-center gap-1 text-[11px] text-gray-600">
+                <Calendar size={10} />
+                {new Date(project.updated_at).toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile list */}
+        <div className="lg:hidden space-y-3">
           {projects.map(project => (
             <div
               key={project.id}
@@ -199,6 +270,7 @@ export default function Dashboard() {
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Create modal */}

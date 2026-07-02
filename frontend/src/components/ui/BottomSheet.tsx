@@ -13,15 +13,20 @@ interface Props {
  * Slide-up bottom sheet with backdrop.
  * Usage: wrap any content that should appear as a mobile panel.
  */
+// Module-level so multiple BottomSheets can be mounted at once without one
+// instance's close clobbering body scroll while a sibling is still open.
+let openSheetCount = 0
+
 export function BottomSheet({ open, onClose, title, children, safeArea = true }: Props) {
-  // Lock body scroll while open
+  // Lock body scroll while open (reference-counted across all open sheets)
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+    if (!open) return
+    openSheetCount += 1
+    document.body.style.overflow = 'hidden'
+    return () => {
+      openSheetCount = Math.max(0, openSheetCount - 1)
+      if (openSheetCount === 0) document.body.style.overflow = ''
     }
-    return () => { document.body.style.overflow = '' }
   }, [open])
 
   if (!open) return null

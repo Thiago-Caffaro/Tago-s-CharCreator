@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Download, CheckSquare, Eye, Code, Wand2, Save,
-  ImagePlus, FileJson, Image as ImageIcon, RefreshCw,
+  ImagePlus, FileJson, Image as ImageIcon, RefreshCw, ChevronDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Editor from '@monaco-editor/react'
@@ -51,7 +51,23 @@ export default function Output() {
   const [exportOpen, setExportOpen] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
 
-  // ── Field regeneration state ────────────────────────────���─────────────────
+  // Desktop export dropdown — kept separate from `exportOpen` (mobile
+  // BottomSheet) since both toolbars are mounted at once behind lg:/hidden
+  // and sharing one flag would pop the mobile sheet open over the desktop UI.
+  const [desktopExportOpen, setDesktopExportOpen] = useState(false)
+  const desktopExportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (desktopExportRef.current && !desktopExportRef.current.contains(e.target as Node)) {
+        setDesktopExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Field regeneration state ─────────────────────────────────────────────
   const [presets, setPresets] = useState<FieldPreset[]>([])
   const [regenField, setRegenField] = useState<string | null>(null)
   const [regenPresetId, setRegenPresetId] = useState<string>('')
@@ -106,6 +122,8 @@ export default function Output() {
         setJsonText(JSON.stringify(updated, null, 2))
         toast.success(`Campo "${FIELD_LABELS[regenField] ?? regenField}" regenerado!`)
         setRegenField(null)
+      } else if (!accumulated.trim()) {
+        toast.error('A IA não retornou conteúdo — tente novamente')
       }
     } catch (e: any) {
       toast.error(e.message || 'Erro na regeneração')
@@ -257,8 +275,86 @@ export default function Output() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* Tab bar */}
-      <div className="flex items-center border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
+      {/* Desktop tab bar + toolbar */}
+      <div className="hidden lg:flex items-center gap-1 px-4 pt-3 border-b border-[#2a2a2a] shrink-0">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors border-b-2 -mb-px
+              ${tab === t.id ? 'text-[#9b59b6] border-[#9b59b6]' : 'text-gray-500 border-transparent hover:text-gray-300'}`}
+          >
+            <t.icon size={12} />
+            {t.label}
+          </button>
+        ))}
+
+        <div className="ml-auto flex items-center gap-2 pb-1">
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            title={avatarDataUrl ? 'Trocar imagem do personagem' : 'Carregar imagem do personagem'}
+            className="relative flex items-center justify-center w-7 h-7 rounded-lg border border-[#333]
+              bg-[#242424] hover:border-[#555] transition-colors overflow-hidden shrink-0"
+          >
+            {avatarDataUrl
+              ? <img src={avatarDataUrl} alt="avatar" className="w-full h-full object-cover" />
+              : <ImagePlus size={13} className="text-gray-500" />
+            }
+          </button>
+
+          <Button variant="secondary" size="sm" onClick={handleSave} loading={saving} disabled={saving || !hasContent}>
+            <Save size={13} />
+            {saving ? 'Salvando…' : 'Salvar'}
+          </Button>
+
+          <div ref={desktopExportRef} className="relative">
+            <button
+              onClick={() => setDesktopExportOpen(o => !o)}
+              disabled={!generatedCard}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                bg-[#242424] border border-[#333] text-gray-300
+                hover:border-[#555] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download size={13} />
+              Exportar
+              <ChevronDown size={11} className={`text-gray-500 transition-transform ${desktopExportOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {desktopExportOpen && generatedCard && (
+              <div className="absolute right-0 mt-1 w-44 rounded-lg border border-[#333] bg-[#1e1e1e]
+                shadow-xl overflow-hidden z-50">
+                <button
+                  onClick={() => { exportCard(generatedCard, currentProject?.character_name || 'character'); setDesktopExportOpen(false) }}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
+                    hover:bg-[#2a2a2a] transition-colors"
+                >
+                  <FileJson size={13} className="text-[#9b59b6]" />
+                  Download .json
+                </button>
+                <button
+                  onClick={async () => {
+                    setDesktopExportOpen(false)
+                    try {
+                      await exportCardAsPng(generatedCard, avatarDataUrl, currentProject?.character_name || 'character')
+                    } catch { toast.error('Erro ao exportar PNG') }
+                  }}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
+                    hover:bg-[#2a2a2a] transition-colors border-t border-[#2a2a2a]"
+                >
+                  <ImageIcon size={13} className="text-[#9b59b6]" />
+                  <span className="flex-1 text-left">Download .png</span>
+                  {!avatarDataUrl && <span className="text-[10px] text-gray-600 ml-1">placeholder</span>}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile tab bar */}
+      <div className="flex lg:hidden items-center border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -277,8 +373,6 @@ export default function Output() {
 
         {/* Actions: avatar + save + export */}
         <div className="flex items-center gap-1 px-2 pb-1 shrink-0">
-          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-
           <button
             onClick={() => avatarInputRef.current?.click()}
             className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#333]

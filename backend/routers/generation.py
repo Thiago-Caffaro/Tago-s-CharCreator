@@ -16,6 +16,21 @@ import re as _re
 
 router = APIRouter(prefix="/api/generate", tags=["generation"])
 
+# Appended to a stream in place of raising mid-response: by the time an LLM
+# call fails, the StreamingResponse has already sent a 200 with the body
+# open, so there's no way to turn it into a clean 4xx/5xx. Instead we emit
+# this marker and let the frontend detect it and raise a proper error.
+STREAM_ERROR_MARKER = "\n__STREAM_ERROR__:"
+
+
+def _stream_with_errors(system: str, user: str, max_tokens: int | None = None):
+    """Wrap stream_message so API/network failures surface as a marker instead of killing the connection silently."""
+    try:
+        for chunk in stream_message(system, user, max_tokens=max_tokens):
+            yield chunk
+    except Exception as e:
+        yield f"{STREAM_ERROR_MARKER}{e}"
+
 
 def _dedup_sections(text: str) -> str:
     """Collapse repeated <== Section Name ==> headers in description output.
@@ -318,65 +333,69 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
             "tags": [],
         }
 
-        for field in _CHUNKED_FIELDS:
-            yield f"__FIELD__:{field}\n"
+        try:
+            for field in _CHUNKED_FIELDS:
+                yield f"__FIELD__:{field}\n"
 
-            # Prefer a user-selected preset for this field; fall back to the
-            # compact FIELD_SYSTEM prompt which is ~5x smaller than DEFAULT_SYSTEM
-            preset = next((p for p in presets if p.target_field == field), None)
-            field_rules = field_rules_map.get(field, [])
-            system, user = prompt_assembler.build_field_prompt(
-                project, cards, field, global_rules, field_rules, preset
-            )
+                # Prefer a user-selected preset for this field; fall back to the
+                # compact FIELD_SYSTEM prompt which is ~5x smaller than DEFAULT_SYSTEM
+                preset = next((p for p in presets if p.target_field == field), None)
+                field_rules = field_rules_map.get(field, [])
+                system, user = prompt_assembler.build_field_prompt(
+                    project, cards, field, global_rules, field_rules, preset
+                )
 
-            # User-configured limit takes priority; fall back to code defaults
-            from ..config import settings as _settings
-            user_limits = _settings.field_max_tokens
-            max_tok = user_limits.get(field) or prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
-            content = ""
-            for chunk in stream_message(system, user, max_tokens=max_tok):
-                content += chunk
-                yield chunk
+                # User-configured limit takes priority; fall back to code defaults
+                from ..config import settings as _settings
+                user_limits = _settings.field_max_tokens
+                configured = user_limits.get(field)
+                max_tok = configured if configured is not None else prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
+                content = ""
+                for chunk in stream_message(system, user, max_tokens=max_tok):
+                    content += chunk
+                    yield chunk
 
-            # Parse array fields
-            if field in ('alternate_greetings', 'tags'):
-                raw = content.strip()
-                # Strip accidental markdown fences
-                if raw.startswith("```"):
-                    raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-                try:
-                    parsed = _json.loads(raw)
-                    if isinstance(parsed, list):
-                        # Unwrap double-encoded arrays: the model sometimes outputs
-                        # ["[\"g1\",\"g2\",\"g3\"]"] — a single-element list whose only
-                        # item is a JSON-encoded string of the real array. Detect and fix.
-                        if (len(parsed) == 1
-                                and isinstance(parsed[0], str)
-                                and parsed[0].strip().startswith("[")):
-                            try:
-                                inner = _json.loads(parsed[0])
-                                if isinstance(inner, list):
-                                    parsed = inner
-                            except Exception:
-                                pass
-                        card_data[field] = parsed
-                    else:
-                        card_data[field] = [raw]
-                except Exception:
-                    card_data[field] = [raw] if field == 'alternate_greetings' else []
-            else:
-                cleaned = content.strip()
-                # Description sometimes has a model loop-back: the model starts
-                # a section, restarts it from the header mid-generation, producing
-                # a duplicate.  Collapse to the last (cleaner) occurrence.
-                if field == 'description':
-                    cleaned = _dedup_sections(cleaned)
-                card_data[field] = cleaned
+                # Parse array fields
+                if field in ('alternate_greetings', 'tags'):
+                    raw = content.strip()
+                    # Strip accidental markdown fences
+                    if raw.startswith("```"):
+                        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+                    try:
+                        parsed = _json.loads(raw)
+                        if isinstance(parsed, list):
+                            # Unwrap double-encoded arrays: the model sometimes outputs
+                            # ["[\"g1\",\"g2\",\"g3\"]"] — a single-element list whose only
+                            # item is a JSON-encoded string of the real array. Detect and fix.
+                            if (len(parsed) == 1
+                                    and isinstance(parsed[0], str)
+                                    and parsed[0].strip().startswith("[")):
+                                try:
+                                    inner = _json.loads(parsed[0])
+                                    if isinstance(inner, list):
+                                        parsed = inner
+                                except Exception:
+                                    pass
+                            card_data[field] = parsed
+                        else:
+                            card_data[field] = [raw]
+                    except Exception:
+                        card_data[field] = [raw] if field == 'alternate_greetings' else []
+                else:
+                    cleaned = content.strip()
+                    # Description sometimes has a model loop-back: the model starts
+                    # a section, restarts it from the header mid-generation, producing
+                    # a duplicate.  Collapse to the last (cleaner) occurrence.
+                    if field == 'description':
+                        cleaned = _dedup_sections(cleaned)
+                    card_data[field] = cleaned
 
-            yield "\n"
+                yield "\n"
 
-        card = {"spec": "chara_card_v2", "spec_version": "2.0", "data": card_data}
-        yield f"__DONE__\n{_json.dumps(card, ensure_ascii=False)}"
+            card = {"spec": "chara_card_v2", "spec_version": "2.0", "data": card_data}
+            yield f"__DONE__\n{_json.dumps(card, ensure_ascii=False)}"
+        except Exception as e:
+            yield f"{STREAM_ERROR_MARKER}{e}"
 
     return StreamingResponse(gen(), media_type="text/plain")
 
@@ -393,15 +412,20 @@ def generate_field(req: FieldRequest, session: Session = Depends(get_session)):
         )
     ).all()
     preset = session.get(FieldPreset, req.preset_id) if req.preset_id else None
+    if preset is not None and preset.target_field != req.field_name:
+        # Stale/mismatched preset id (e.g. leftover UI selection after the
+        # target field changed) — ignore it rather than silently applying
+        # the wrong field's prompt override.
+        preset = None
     system, user = prompt_assembler.build_field_prompt(
         project, cards, req.field_name, global_rules, list(field_rules), preset
     )
 
-    def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
+    from ..config import settings as _settings
+    configured = _settings.field_max_tokens.get(req.field_name)
+    max_tok = configured if configured is not None else prompt_assembler.FIELD_MAX_TOKENS.get(req.field_name, 2048)
 
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(_stream_with_errors(system, user, max_tokens=max_tok), media_type="text/plain")
 
 
 @router.post("/refine")
@@ -411,11 +435,7 @@ def refine_field(req: RefineRequest, session: Session = Depends(get_session)):
         req.field_name, req.current_content, req.instruction, global_rules
     )
 
-    def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
-
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
 
 
 @router.post("/lorebook")
@@ -423,11 +443,7 @@ def generate_lorebook(req: LorebookGenRequest, session: Session = Depends(get_se
     project, cards, global_rules = _load_context(req.project_id, session)
     system, user = prompt_assembler.build_lorebook_prompt(project, cards, req.description, global_rules)
 
-    def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
-
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
 
 
 @router.post("/fix-check")
@@ -460,11 +476,7 @@ def fix_check(req: FixCheckRequest):
         f"Return the JSON object with only the fixed fields {fields_list}."
     )
 
-    def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
-
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
 
 
 @router.post("/fix-card")
@@ -502,11 +514,7 @@ REGRAS ESTRITAS:
         f"Retorne o JSON corrigido e completo, sem nenhum texto fora do JSON."
     )
 
-    def gen():
-        for chunk in stream_message(system, user):
-            yield chunk
-
-    return StreamingResponse(gen(), media_type="text/plain")
+    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
 
 
 @router.post("/token-estimate")

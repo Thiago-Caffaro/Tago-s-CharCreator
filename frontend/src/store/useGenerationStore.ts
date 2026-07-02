@@ -9,7 +9,12 @@ interface GenerationStore {
   selectedField: string
   selectedPresetIds: number[]      // multi-select — used for full-card generation
   selectedPresetId: number | null  // single-select — used for field/refine generation
-  streaming: boolean
+  // Separate flags per flow: GeneratingPage's full-card run can take minutes
+  // and outlives the component if the user navigates away, so it must not
+  // share a flag with GenerationPanel's field/refine run — otherwise one
+  // flow's in-flight state permanently disables the other's button.
+  fullCardStreaming: boolean
+  fieldStreaming: boolean
   streamingText: string
   currentField: string | null      // field being generated in chunked full-card mode
   generatedCard: CharaCardV2 | null
@@ -26,7 +31,8 @@ interface GenerationStore {
   setSelectedPresetIds: (ids: number[]) => void
   togglePresetId: (id: number) => void
   setSelectedPresetId: (id: number | null) => void
-  setStreaming: (v: boolean) => void
+  setFullCardStreaming: (v: boolean) => void
+  setFieldStreaming: (v: boolean) => void
   appendStreamingText: (chunk: string) => void
   resetStreamingText: () => void
   setCurrentField: (field: string | null) => void
@@ -46,7 +52,8 @@ export const useGenerationStore = create<GenerationStore>(set => ({
   selectedField: 'description',
   selectedPresetIds: [],
   selectedPresetId: null,
-  streaming: false,
+  fullCardStreaming: false,
+  fieldStreaming: false,
   streamingText: '',
   currentField: null,
   generatedCard: null,
@@ -66,7 +73,8 @@ export const useGenerationStore = create<GenerationStore>(set => ({
       : [...s.selectedPresetIds, id],
   })),
   setSelectedPresetId: id => set({ selectedPresetId: id }),
-  setStreaming: v => set({ streaming: v }),
+  setFullCardStreaming: v => set({ fullCardStreaming: v }),
+  setFieldStreaming: v => set({ fieldStreaming: v }),
   appendStreamingText: chunk => set(s => ({ streamingText: s.streamingText + chunk })),
   resetStreamingText: () => set({ streamingText: '' }),
   setCurrentField: field => set({ currentField: field }),

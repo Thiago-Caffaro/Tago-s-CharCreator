@@ -7,7 +7,6 @@ import { generationApi } from '../api/generation'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Textarea } from '../components/ui/Textarea'
-import { BottomSheet } from '../components/ui/BottomSheet'
 import { EntryForm } from '../components/lorebook/EntryForm'
 import type { LorebookEntry } from '../types'
 
@@ -78,6 +77,8 @@ export default function Lorebook() {
         }
         toast.success(`${parsed.length} entries geradas!`)
         setShowGenModal(false)
+      } else {
+        toast.error('A IA retornou um formato inesperado — tente novamente')
       }
     } catch {
       toast.error('Erro ao gerar entries')
@@ -87,10 +88,31 @@ export default function Lorebook() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full">
+    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
+      {/* Desktop toolbar */}
+      <div className="hidden lg:flex items-center justify-between px-5 py-3 border-b border-[#2a2a2a] shrink-0">
+        <span className="text-sm font-semibold text-gray-200">
+          Lorebook <span className="text-gray-600 font-normal">({entries.length})</span>
+        </span>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowGenModal(true)}>
+            <Wand2 size={13} /> Gerar Entries
+          </Button>
+          <a href={lorebookApi.exportUrl(id)} download>
+            <Button variant="secondary" size="sm">
+              <Download size={13} /> Exportar
+            </Button>
+          </a>
+          <Button size="sm" onClick={handleCreate}>
+            <Plus size={13} /> Nova Entry
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile toolbar */}
+      <div className="flex lg:hidden items-center gap-2 px-4 py-3 border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
         <span className="text-sm font-semibold text-gray-200 flex-1">
           Lorebook <span className="text-gray-600 font-normal text-xs">({entries.length})</span>
         </span>
@@ -139,7 +161,51 @@ export default function Lorebook() {
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
+          <>
+          {/* Desktop table */}
+          <table className="hidden lg:table w-full text-xs">
+            <thead>
+              <tr className="text-gray-500 border-b border-[#2a2a2a]">
+                <th className="text-left py-2 px-3 font-medium">Nome</th>
+                <th className="text-left py-2 px-3 font-medium">Keywords</th>
+                <th className="text-left py-2 px-3 font-medium">Conteúdo</th>
+                <th className="text-left py-2 px-3 font-medium">Status</th>
+                <th className="py-2 px-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map(entry => {
+                const keys = JSON.parse(entry.keys || '[]') as string[]
+                return (
+                  <tr
+                    key={entry.id}
+                    className="border-b border-[#1e1e1e] hover:bg-[#1e1e1e] cursor-pointer transition-colors"
+                    onClick={() => setSelected(entry)}
+                  >
+                    <td className="py-2 px-3 text-gray-300 font-medium">{entry.name || '—'}</td>
+                    <td className="py-2 px-3 text-gray-500">{keys.slice(0, 3).join(', ')}{keys.length > 3 ? '...' : ''}</td>
+                    <td className="py-2 px-3 text-gray-600 max-w-[200px] truncate">{entry.content}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] ${entry.enabled ? 'bg-green-900/30 text-green-400' : 'bg-gray-900/30 text-gray-500'}`}>
+                        {entry.enabled ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
+                      <button
+                        className="text-gray-600 hover:text-red-400 p-1 rounded transition-colors"
+                        onClick={e => handleDelete(e, entry)}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+
+          {/* Mobile card list */}
+          <div className="lg:hidden space-y-2">
             {entries.map(entry => {
               const keys = JSON.parse(entry.keys || '[]') as string[]
               return (
@@ -187,12 +253,26 @@ export default function Lorebook() {
               )
             })}
           </div>
+          </>
         )}
       </div>
+    </div>
 
-      {/* Entry editor — full-screen overlay */}
+      {/* Desktop: entry editor as a sidebar */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overlay-up"
+        <div className="hidden lg:block">
+          <EntryForm
+            entry={selected}
+            onClose={() => setSelected(null)}
+            onSave={handleSave}
+            desktop
+          />
+        </div>
+      )}
+
+      {/* Mobile: entry editor as a full-screen overlay */}
+      {selected && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-[#0f0f0f] flex flex-col overlay-up"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
           <EntryForm
             entry={selected}
@@ -203,7 +283,12 @@ export default function Lorebook() {
       )}
 
       {/* Generate modal */}
-      <Modal open={showGenModal} onClose={() => setShowGenModal(false)} title="Gerar Entries com IA" size="md">
+      <Modal
+        open={showGenModal}
+        onClose={() => { if (!generating) setShowGenModal(false) }}
+        title="Gerar Entries com IA"
+        size="md"
+      >
         <div className="space-y-4">
           <Textarea
             label="Descreva o que gerar"
@@ -218,10 +303,20 @@ export default function Lorebook() {
             </pre>
           )}
           <div className="flex gap-2 pt-1">
-            <Button variant="secondary" onClick={() => setShowGenModal(false)} className="flex-1">
+            <Button
+              variant="secondary"
+              onClick={() => setShowGenModal(false)}
+              disabled={generating}
+              className="flex-1"
+            >
               Cancelar
             </Button>
-            <Button loading={generating} onClick={handleGenerate} disabled={!genDescription.trim()} className="flex-1">
+            <Button
+              loading={generating}
+              onClick={handleGenerate}
+              disabled={generating || !genDescription.trim()}
+              className="flex-1"
+            >
               <Wand2 size={13} /> Gerar
             </Button>
           </div>

@@ -30,9 +30,9 @@ const MODE_OPTIONS = [
 export function GenerationPanel({ projectId, desktop }: Props) {
   const navigate = useNavigate()
   const {
-    mode, selectedField, selectedPresetIds, selectedPresetId, streaming,
+    mode, selectedField, selectedPresetIds, selectedPresetId, fieldStreaming,
     setMode, setSelectedField, setSelectedPresetIds, setSelectedPresetId,
-    setStreaming, appendStreamingText, resetStreamingText,
+    setFieldStreaming, appendStreamingText, resetStreamingText,
     setCurrentField, setGeneratedCard, resetFieldProgress,
   } = useGenerationStore()
 
@@ -51,7 +51,7 @@ export function GenerationPanel({ projectId, desktop }: Props) {
   ]
 
   const handleGenerate = async () => {
-    if (streaming) return
+    if (fieldStreaming) return
 
     if (mode === 'full') {
       resetFieldProgress()
@@ -60,7 +60,7 @@ export function GenerationPanel({ projectId, desktop }: Props) {
       return
     }
 
-    setStreaming(true)
+    setFieldStreaming(true)
     resetStreamingText()
     setCurrentField(null)
 
@@ -75,7 +75,7 @@ export function GenerationPanel({ projectId, desktop }: Props) {
     } catch (e: any) {
       toast.error(e.message || 'Erro na geração')
     } finally {
-      setStreaming(false)
+      setFieldStreaming(false)
       setCurrentField(null)
     }
   }
@@ -138,8 +138,8 @@ export function GenerationPanel({ projectId, desktop }: Props) {
 
       <Button
         onClick={handleGenerate}
-        loading={mode !== 'full' && streaming}
-        disabled={mode !== 'full' && streaming}
+        loading={mode !== 'full' && fieldStreaming}
+        disabled={mode !== 'full' && fieldStreaming}
         className="w-full justify-center"
         size="md"
       >

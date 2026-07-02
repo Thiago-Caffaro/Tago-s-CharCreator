@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     database_url: str = "sqlite:///./data/tagosCharCreator.db"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
-    default_model: str = "atlascloud/glm-4"
-    preferred_provider: str = ""
+    default_model: str = "z-ai/glm-4.7"
+    preferred_provider: str = "atlas-cloud"
     max_tokens: int = 32768
     temperature: float = 1.0
     top_p: float = 0.999

@@ -13,10 +13,12 @@ export function Toggle({ checked, onChange, label, size = 'md' }: ToggleProps) {
   const translate = size === 'sm' ? 'translate-x-4' : 'translate-x-5'
 
   return (
-    <label className="flex items-center gap-2 cursor-pointer select-none">
+    <label
+      className="flex items-center gap-2 cursor-pointer select-none"
+      onClick={() => onChange(!checked)}
+    >
       <div
         className={`relative ${track} rounded-full transition-colors ${checked ? 'bg-[#9b59b6]' : 'bg-[#333]'}`}
-        onClick={() => onChange(!checked)}
       >
         <div
           className={`absolute top-0.5 left-0.5 ${thumb} rounded-full bg-white shadow transition-transform ${checked ? translate : 'translate-x-0'}`}

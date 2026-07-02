@@ -96,17 +96,59 @@ export const generationApi = {
   },
 }
 
+// Emitted by the backend in place of raising mid-stream (the HTTP response
+// is already open by the time an LLM call fails, so a clean 4xx isn't
+// possible — see backend/routers/generation.py's _stream_with_errors).
+const STREAM_ERROR_MARKER = '\n__STREAM_ERROR__:'
+
 async function readStream(response: Response, onChunk?: (chunk: string) => void): Promise<string> {
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    let detail = text
+    try { detail = JSON.parse(text)?.detail || text } catch { /* not JSON */ }
+    throw new Error(detail || `HTTP ${response.status}`)
+  }
+
   const reader = response.body!.getReader()
+  // { stream: true } keeps partial multi-byte UTF-8 sequences (e.g. accented
+  // characters split across chunk boundaries) buffered instead of corrupting
+  // them into U+FFFD replacement chars.
   const decoder = new TextDecoder()
+  const keepTail = STREAM_ERROR_MARKER.length - 1
+
   let result = ''
+  let pending = ''
+
+  const emit = (text: string) => {
+    if (!text) return
+    result += text
+    onChunk?.(text)
+  }
+
+  // Buffers a lookback tail so the error marker is never split across an
+  // emit boundary, mirroring the backend's <think> tag streaming filter.
+  const push = (text: string) => {
+    pending += text
+    const idx = pending.indexOf(STREAM_ERROR_MARKER)
+    if (idx !== -1) {
+      emit(pending.slice(0, idx))
+      const message = pending.slice(idx + STREAM_ERROR_MARKER.length).trim()
+      pending = ''
+      throw new Error(message || 'Erro ao gerar conteúdo — verifique o modelo/chave configurados')
+    }
+    if (pending.length > keepTail) {
+      emit(pending.slice(0, pending.length - keepTail))
+      pending = pending.slice(pending.length - keepTail)
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
+    if (value) push(decoder.decode(value, { stream: true }))
     if (done) break
-    const chunk = decoder.decode(value)
-    result += chunk
-    onChunk?.(chunk)
   }
+  push(decoder.decode())
+  emit(pending)
+
   return result
 }

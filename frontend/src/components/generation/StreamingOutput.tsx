@@ -13,7 +13,7 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 export function StreamingOutput() {
-  const { streamingText, streaming, currentField } = useGenerationStore()
+  const { streamingText, fieldStreaming: streaming, currentField } = useGenerationStore()
   const ref = useRef<HTMLPreElement>(null)
 
   useEffect(() => {
