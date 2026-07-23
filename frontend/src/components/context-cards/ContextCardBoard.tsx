@@ -19,6 +19,7 @@ import type { ContextCard as ContextCardType } from '../../types'
 import { ContextCard } from './ContextCard'
 import { AddCardMenu } from './AddCardMenu'
 import { SearchInput } from '../ui/SearchInput'
+import { ConfirmModal } from '../ui/ConfirmModal'
 import { useContextCardStore } from '../../store/useContextCardStore'
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
 export function ContextCardBoard({ projectId, onSelectCard }: Props) {
   const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards } = useContextCardStore()
   const [search, setSearch] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<ContextCardType | null>(null)
 
   const query = search.trim().toLowerCase()
   const filteredCards = query
@@ -68,12 +70,15 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
     }
   }
 
-  const handleDelete = async (card: ContextCardType) => {
+  const handleDelete = async () => {
+    if (!confirmDelete) return
     try {
-      await deleteCard(card.id)
+      await deleteCard(confirmDelete.id)
       toast.success('Card removido')
     } catch {
       toast.error('Erro ao remover card')
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
@@ -109,7 +114,7 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
                 card={card}
                 onSelect={onSelectCard}
                 onToggle={handleToggle}
-                onDelete={handleDelete}
+                onDelete={setConfirmDelete}
                 onDuplicate={handleDuplicate}
               />
             ))}
@@ -129,6 +134,13 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
           <p className="text-gray-500 text-sm">Nenhum card encontrado para "{search.trim()}"</p>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={<>Deletar o card <strong className="text-white">{confirmDelete?.title}</strong>?</>}
+      />
     </div>
   )
 }

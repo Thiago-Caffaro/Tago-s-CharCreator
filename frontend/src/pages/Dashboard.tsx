@@ -9,6 +9,7 @@ import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { SearchInput } from '../components/ui/SearchInput'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import type { Project } from '../types'
 
 export default function Dashboard() {
@@ -372,19 +373,14 @@ export default function Dashboard() {
       </Modal>
 
       {/* Delete confirm modal */}
-      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Confirmar exclusão" size="sm">
-        <p className="text-sm text-gray-300 mb-5">
-          Deletar <strong className="text-white">{confirmDelete?.name}</strong>? Todos os cards e lorebook entries serão removidos.
-        </p>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setConfirmDelete(null)} className="flex-1">
-            Cancelar
-          </Button>
-          <Button variant="danger" onClick={handleDelete} className="flex-1">
-            Deletar
-          </Button>
-        </div>
-      </Modal>
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={
+          <>Deletar <strong className="text-white">{confirmDelete?.name}</strong>? Todos os cards e lorebook entries serão removidos.</>
+        }
+      />
     </div>
   )
 }

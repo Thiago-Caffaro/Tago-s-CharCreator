@@ -13,6 +13,7 @@ import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 import { Toggle } from '../components/ui/Toggle'
 import { SearchInput } from '../components/ui/SearchInput'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { PresetCard } from '../components/presets/PresetCard'
 import { PresetEditor } from '../components/presets/PresetEditor'
 import { CardTypeCard } from '../components/presets/CardTypeCard'
@@ -41,6 +42,7 @@ function PresetsTab() {
   const [selected, setSelected] = useState<FieldPreset | null>(null)
   const [fieldFilter, setFieldFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<FieldPreset | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
@@ -133,11 +135,18 @@ function PresetsTab() {
     toast.success('Preset salvo')
   }
 
-  const handleDelete = async (preset: FieldPreset) => {
-    await presetsApi.delete(preset.id)
-    setPresets(prev => prev.filter(p => p.id !== preset.id))
-    if (selected?.id === preset.id) setSelected(null)
-    toast.success('Preset removido')
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    try {
+      await presetsApi.delete(confirmDelete.id)
+      setPresets(prev => prev.filter(p => p.id !== confirmDelete.id))
+      if (selected?.id === confirmDelete.id) setSelected(null)
+      toast.success('Preset removido')
+    } catch {
+      toast.error('Erro ao remover preset')
+    } finally {
+      setConfirmDelete(null)
+    }
   }
 
   const handleDuplicate = async (preset: FieldPreset) => {
@@ -240,7 +249,7 @@ function PresetsTab() {
                         key={p.id}
                         preset={p}
                         onSelect={setSelected}
-                        onDelete={handleDelete}
+                        onDelete={setConfirmDelete}
                         onDuplicate={handleDuplicate}
                         onToggleDefault={handleToggleDefault}
                       />
@@ -295,6 +304,13 @@ function PresetsTab() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={<>Deletar o preset <strong className="text-white">{confirmDelete?.name}</strong>?</>}
+      />
     </div>
   )
 }
@@ -309,6 +325,7 @@ function TiposTab() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ slug: '', label: '', color: '#9b59b6' })
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<CardTypeConfig | null>(null)
 
   const load = async () => {
     try {
@@ -343,14 +360,17 @@ function TiposTab() {
     toast.success('Tipo salvo')
   }
 
-  const handleDelete = async (ct: CardTypeConfig) => {
+  const handleDelete = async () => {
+    if (!confirmDelete) return
     try {
-      await cardTypesApi.delete(ct.id)
-      setTypes(prev => prev.filter(t => t.id !== ct.id))
-      if (selected?.id === ct.id) setSelected(null)
+      await cardTypesApi.delete(confirmDelete.id)
+      setTypes(prev => prev.filter(t => t.id !== confirmDelete.id))
+      if (selected?.id === confirmDelete.id) setSelected(null)
       toast.success('Tipo removido')
     } catch (e: any) {
       toast.error(e.response?.data?.detail || 'Erro ao remover tipo')
+    } finally {
+      setConfirmDelete(null)
     }
   }
 
@@ -396,7 +416,7 @@ function TiposTab() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {builtin.map(ct => (
-                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={setConfirmDelete} onDuplicate={handleDuplicate} />
                     ))}
                   </div>
                 </div>
@@ -409,7 +429,7 @@ function TiposTab() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {custom.map(ct => (
-                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} onDuplicate={handleDuplicate} />
+                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={setConfirmDelete} onDuplicate={handleDuplicate} />
                     ))}
                   </div>
                 </div>
@@ -484,6 +504,13 @@ function TiposTab() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={<>Deletar o tipo <strong className="text-white">{confirmDelete?.label}</strong>?</>}
+      />
     </div>
   )
 }

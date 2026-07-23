@@ -6,6 +6,7 @@ import { lorebookApi } from '../api/lorebook'
 import { generationApi } from '../api/generation'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
+import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Textarea } from '../components/ui/Textarea'
 import { EntryForm } from '../components/lorebook/EntryForm'
 import type { LorebookEntry } from '../types'
@@ -20,6 +21,7 @@ export default function Lorebook() {
   const [genDescription, setGenDescription] = useState('')
   const [generating, setGenerating] = useState(false)
   const [streamText, setStreamText] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<LorebookEntry | null>(null)
 
   const load = async () => {
     try {
@@ -49,12 +51,23 @@ export default function Lorebook() {
     toast.success('Entry salva')
   }
 
-  const handleDelete = async (e: React.MouseEvent, entry: LorebookEntry) => {
+  const requestDelete = (e: React.MouseEvent, entry: LorebookEntry) => {
     e.stopPropagation()
-    await lorebookApi.delete(entry.id)
-    setEntries(prev => prev.filter(x => x.id !== entry.id))
-    if (selected?.id === entry.id) setSelected(null)
-    toast.success('Entry removida')
+    setConfirmDelete(entry)
+  }
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    try {
+      await lorebookApi.delete(confirmDelete.id)
+      setEntries(prev => prev.filter(x => x.id !== confirmDelete.id))
+      if (selected?.id === confirmDelete.id) setSelected(null)
+      toast.success('Entry removida')
+    } catch {
+      toast.error('Erro ao remover entry')
+    } finally {
+      setConfirmDelete(null)
+    }
   }
 
   const handleDuplicate = async (e: React.MouseEvent, entry: LorebookEntry) => {
@@ -225,7 +238,7 @@ export default function Lorebook() {
                         </button>
                         <button
                           className="text-gray-600 hover:text-red-400 p-1 rounded transition-colors"
-                          onClick={e => handleDelete(e, entry)}
+                          onClick={e => requestDelete(e, entry)}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -280,7 +293,7 @@ export default function Lorebook() {
                         <Copy size={14} />
                       </button>
                       <button
-                        onClick={e => handleDelete(e, entry)}
+                        onClick={e => requestDelete(e, entry)}
                         className="flex items-center justify-center w-8 h-8 rounded-xl
                           text-gray-600 active:bg-red-900/20 active:text-red-400 transition-colors"
                       >
@@ -362,6 +375,13 @@ export default function Lorebook() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={<>Deletar a entry <strong className="text-white">{confirmDelete?.name || 'sem nome'}</strong>?</>}
+      />
     </div>
   )
 }
