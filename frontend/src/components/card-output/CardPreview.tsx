@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import type { CharaCardV2 } from '../../types'
 import { CHARA_FIELDS } from '../../types'
+import { FormattedText } from './FormattedText'
 
 interface Props {
   card: CharaCardV2
@@ -79,9 +80,9 @@ export function CardPreview({ card, onRegenerateField }: Props) {
               </div>
               <RegenBtn />
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap bg-[#1a1a1a] rounded-xl p-3">
-              {alts[altIndex] || '—'}
-            </p>
+            <div className="text-xs text-gray-300 whitespace-pre-wrap bg-[#1a1a1a] rounded-xl p-3">
+              <FormattedText text={alts[altIndex] || ''} />
+            </div>
           </div>
         )
       }
@@ -113,9 +114,9 @@ export function CardPreview({ card, onRegenerateField }: Props) {
           <span className="text-[10px] font-semibold text-[#9b59b6] uppercase tracking-wider">{label}</span>
           <RegenBtn />
         </div>
-        <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap bg-[#1a1a1a] rounded-xl p-3 font-mono">
-          {String(value) || '—'}
-        </p>
+        <div className="text-xs text-gray-300 whitespace-pre-wrap bg-[#1a1a1a] rounded-xl p-3">
+          <FormattedText text={String(value ?? '')} />
+        </div>
       </div>
     )
   }
