@@ -1,9 +1,9 @@
 import React from 'react'
 import { Eye, Brain, Zap, Heart, Flame, Globe, Map, FileText, Puzzle } from 'lucide-react'
-import type { CardType } from '../../types'
-import { CARD_TYPE_COLORS } from '../../types'
+import { useCardTypeStore } from '../../store/useCardTypeStore'
 
-const icons: Record<CardType, React.ElementType> = {
+// Known icons for the seeded builtin slugs; any custom type falls back to Puzzle.
+const SLUG_ICONS: Record<string, React.ElementType> = {
   appearance: Eye,
   personality: Brain,
   special_state: Zap,
@@ -15,8 +15,8 @@ const icons: Record<CardType, React.ElementType> = {
   custom: Puzzle,
 }
 
-export function ContextCardTypeIcon({ type, size = 14 }: { type: CardType; size?: number }) {
-  const Icon = icons[type]
-  const color = CARD_TYPE_COLORS[type]
-  return <Icon size={size} style={{ color }} />
+export function ContextCardTypeIcon({ type, size = 14 }: { type: string; size?: number }) {
+  const color = useCardTypeStore(s => s.types.find(t => t.slug === type)?.color)
+  const Icon = SLUG_ICONS[type] ?? Puzzle
+  return <Icon size={size} style={{ color: color ?? '#9b59b6' }} />
 }

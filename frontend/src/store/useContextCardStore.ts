@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { contextCardsApi } from '../api/contextCards'
-import type { ContextCard, CardType } from '../types'
+import type { ContextCard } from '../types'
 
 interface ContextCardStore {
   cards: ContextCard[]
   selectedCard: ContextCard | null
   loading: boolean
   fetchCards: (projectId: number) => Promise<void>
-  createCard: (projectId: number, data: { title: string; card_type: CardType }) => Promise<void>
+  createCard: (projectId: number, data: { title: string; card_type: string }) => Promise<void>
   updateCard: (cardId: number, data: Partial<ContextCard>) => Promise<void>
   deleteCard: (cardId: number) => Promise<void>
   reorderCards: (projectId: number, cards: ContextCard[]) => Promise<void>

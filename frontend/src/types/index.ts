@@ -25,7 +25,9 @@ export interface ContextCard {
   id: number
   project_id: number
   title: string
-  card_type: CardType
+  // A slug into CardTypeConfig (fetched via useCardTypeStore) — not the fixed
+  // CardType union, since custom user-defined types are now assignable too.
+  card_type: string
   content: string
   is_active: boolean
   order_index: number

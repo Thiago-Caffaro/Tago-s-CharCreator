@@ -1,9 +1,9 @@
 import client from './client'
-import type { ContextCard, CardType } from '../types'
+import type { ContextCard } from '../types'
 
 interface CreateCardData {
   title: string
-  card_type: CardType
+  card_type: string
   content?: string
   is_active?: boolean
   order_index?: number

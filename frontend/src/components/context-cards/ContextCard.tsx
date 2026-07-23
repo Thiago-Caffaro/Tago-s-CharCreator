@@ -3,9 +3,8 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Trash2 } from 'lucide-react'
 import type { ContextCard as ContextCardType } from '../../types'
-import { CARD_TYPE_COLORS } from '../../types'
+import { useCardTypeStore } from '../../store/useCardTypeStore'
 import { ContextCardTypeIcon } from './ContextCardTypeIcon'
-import { Badge } from '../ui/Badge'
 import { Toggle } from '../ui/Toggle'
 
 interface Props {
@@ -25,7 +24,7 @@ export function ContextCard({ card, onSelect, onToggle, onDelete }: Props) {
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const borderColor = CARD_TYPE_COLORS[card.card_type]
+  const borderColor = useCardTypeStore(s => s.types.find(t => t.slug === card.card_type)?.color) ?? '#9b59b6'
 
   return (
     <div

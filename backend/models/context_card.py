@@ -21,7 +21,12 @@ class CardType(str, Enum):
 
 class ContextCardBase(SQLModel):
     title: str
-    card_type: CardType = CardType.CUSTOM
+    # Plain string, not the CardType enum: a card's type is really a slug into
+    # CardTypeConfig, which supports user-defined types beyond the 9 builtins
+    # the enum originally enumerated. Kept as free text (like target_field)
+    # rather than a DB-level FK since CardTypeConfig has no uniqueness lock
+    # beyond the router's manual slug check.
+    card_type: str = "custom"
     content: str = ""
     is_active: bool = True
     order_index: int = 0
@@ -42,7 +47,7 @@ class ContextCardCreate(ContextCardBase):
 
 class ContextCardUpdate(SQLModel):
     title: Optional[str] = None
-    card_type: Optional[CardType] = None
+    card_type: Optional[str] = None
     content: Optional[str] = None
     is_active: Optional[bool] = None
     order_index: Optional[int] = None

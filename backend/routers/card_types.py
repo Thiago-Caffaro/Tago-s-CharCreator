@@ -25,7 +25,7 @@ def create_type(data: CardTypeConfigCreate, session: Session = Depends(get_sessi
     existing = session.exec(select(CardTypeConfig).where(CardTypeConfig.slug == slug)).first()
     if existing:
         raise HTTPException(status_code=409, detail="Slug já existe")
-    ct = CardTypeConfig(**data.model_dump(), slug=slug, is_builtin=False)
+    ct = CardTypeConfig(**data.model_dump(exclude={"slug"}), slug=slug, is_builtin=False)
     session.add(ct)
     session.commit()
     session.refresh(ct)

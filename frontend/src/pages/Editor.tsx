@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Layers2, Wand2 } from 'lucide-react'
 import { useProjectStore } from '../store/useProjectStore'
 import { useContextCardStore } from '../store/useContextCardStore'
+import { useCardTypeStore } from '../store/useCardTypeStore'
 import { ContextCardBoard } from '../components/context-cards/ContextCardBoard'
 import { ContextCardEditor } from '../components/context-cards/ContextCardEditor'
 import { GenerationPanel } from '../components/generation/GenerationPanel'
@@ -14,11 +15,13 @@ export default function Editor() {
   const id = Number(projectId)
   const { fetchProject } = useProjectStore()
   const { fetchCards, selectedCard, setSelectedCard, updateCard } = useContextCardStore()
+  const { fetchTypes } = useCardTypeStore()
   const [tab, setTab] = useState<Tab>('cards')
 
   useEffect(() => {
     fetchProject(id)
     fetchCards(id)
+    fetchTypes()
   }, [id])
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [

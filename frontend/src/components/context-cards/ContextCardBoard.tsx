@@ -15,7 +15,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import toast from 'react-hot-toast'
-import type { ContextCard as ContextCardType, CardType } from '../../types'
+import type { ContextCard as ContextCardType } from '../../types'
 import { ContextCard } from './ContextCard'
 import { AddCardMenu } from './AddCardMenu'
 import { useContextCardStore } from '../../store/useContextCardStore'
@@ -42,9 +42,9 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
     reorderCards(projectId, newCards)
   }
 
-  const handleAdd = async (type: CardType) => {
+  const handleAdd = async (type: string, label: string) => {
     try {
-      await createCard(projectId, { title: type.replace('_', ' '), card_type: type })
+      await createCard(projectId, { title: label, card_type: type })
     } catch {
       toast.error('Erro ao criar card')
     }

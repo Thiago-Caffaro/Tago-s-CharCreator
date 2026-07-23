@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import type { ContextCard, CardType } from '../../types'
-import { CARD_TYPE_LABELS, CHARA_FIELDS } from '../../types'
+import type { ContextCard } from '../../types'
+import { CHARA_FIELDS } from '../../types'
+import { useCardTypeStore } from '../../store/useCardTypeStore'
 import { Input } from '../ui/Input'
 import { Textarea } from '../ui/Textarea'
 import { Select } from '../ui/Select'
@@ -15,7 +16,6 @@ interface Props {
   desktop?: boolean
 }
 
-const CARD_TYPE_OPTIONS = Object.entries(CARD_TYPE_LABELS).map(([value, label]) => ({ value, label }))
 const FIELD_OPTIONS = [
   { value: '', label: 'Livre (sem campo-alvo)' },
   ...CHARA_FIELDS.map(f => ({ value: f, label: f })),
@@ -23,10 +23,15 @@ const FIELD_OPTIONS = [
 
 export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
   const [title, setTitle] = useState('')
-  const [cardType, setCardType] = useState<CardType>('custom')
+  const [cardType, setCardType] = useState('custom')
   const [content, setContent] = useState('')
   const [targetField, setTargetField] = useState('')
   const [saving, setSaving] = useState(false)
+  // Select the raw array (stable reference) and derive options outside the
+  // selector — mapping inside the selector would return a new array/objects
+  // on every call and trip useSyncExternalStore's infinite-loop guard.
+  const types = useCardTypeStore(s => s.types)
+  const cardTypeOptions = types.map(t => ({ value: t.slug, label: t.label }))
 
   useEffect(() => {
     if (card) {
@@ -66,7 +71,7 @@ export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
         </div>
         <div className="flex-1 overflow-auto p-4 space-y-4">
           <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
-          <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value as CardType)} options={CARD_TYPE_OPTIONS} />
+          <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value)} options={cardTypeOptions} />
           <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
           <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={16} />
         </div>
@@ -94,7 +99,7 @@ export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
       </div>
       <div className="flex-1 overflow-auto p-4 space-y-4">
         <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
-        <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value as CardType)} options={CARD_TYPE_OPTIONS} />
+        <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value)} options={cardTypeOptions} />
         <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
         <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={14} />
       </div>
