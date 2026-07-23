@@ -6,7 +6,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw } from 'lucide-react'
+import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw, Pencil } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { rulesApi } from '../api/rules'
@@ -14,8 +14,19 @@ import client from '../api/client'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
+import { Select } from '../components/ui/Select'
 import { Toggle } from '../components/ui/Toggle'
 import type { GenerationRule } from '../types'
+import { CHARA_FIELDS } from '../types'
+
+const SCOPE_OPTIONS = [
+  { value: 'global', label: 'Global' },
+  { value: 'per_field', label: 'Por Campo' },
+]
+const RULE_FIELD_OPTIONS = [
+  { value: '', label: 'Selecione o campo...' },
+  ...CHARA_FIELDS.map(f => ({ value: f, label: f })),
+]
 
 interface ORModel {
   id: string
@@ -258,19 +269,87 @@ function ProviderPicker({
 }
 
 function SortableRule({
-  rule, onToggle, onDelete,
-}: { rule: GenerationRule; onToggle: (id: number, v: boolean) => void; onDelete: (id: number) => void }) {
+  rule, onToggle, onDelete, onUpdate,
+}: {
+  rule: GenerationRule
+  onToggle: (id: number, v: boolean) => void
+  onDelete: (id: number) => void
+  onUpdate: (id: number, data: Partial<GenerationRule>) => Promise<void>
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rule.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(rule.name)
+  const [content, setContent] = useState(rule.content)
+  const [scope, setScope] = useState(rule.scope)
+  const [targetField, setTargetField] = useState(rule.target_field ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const startEdit = () => {
+    setName(rule.name)
+    setContent(rule.content)
+    setScope(rule.scope)
+    setTargetField(rule.target_field ?? '')
+    setEditing(true)
+  }
+
+  const handleSave = async () => {
+    if (!name.trim() || !content.trim()) return
+    setSaving(true)
+    try {
+      await onUpdate(rule.id, {
+        name, content, scope,
+        target_field: scope === 'per_field' ? (targetField || undefined) : undefined,
+      })
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div ref={setNodeRef} style={style} className="p-3 bg-[#1e1e1e] border border-[#9b59b6]/40 rounded-lg space-y-2">
+        <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nome da regra..." />
+        <Textarea value={content} onChange={e => setContent(e.target.value)} rows={3} placeholder="Conteúdo da regra..." />
+        <div className="grid grid-cols-2 gap-2">
+          <Select value={scope} onChange={e => setScope(e.target.value as 'global' | 'per_field')} options={SCOPE_OPTIONS} />
+          {scope === 'per_field' && (
+            <Select value={targetField} onChange={e => setTargetField(e.target.value)} options={RULE_FIELD_OPTIONS} />
+          )}
+        </div>
+        <div className="flex gap-2 justify-end pt-1">
+          <Button size="sm" variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
+          <Button size="sm" loading={saving} onClick={handleSave}>Salvar</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={setNodeRef} style={style} className="flex items-start gap-2 p-3 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg">
       <button {...attributes} {...listeners} className="mt-0.5 text-gray-600 hover:text-gray-400 cursor-grab">
         <GripVertical size={14} />
       </button>
       <div className="flex-1 min-w-0">
-        <span className="text-xs font-medium text-gray-300 block">{rule.name}</span>
-        <span className="text-xs text-gray-600 font-mono">{rule.content}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-gray-300">{rule.name}</span>
+          {rule.scope === 'per_field' && (
+            <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[#9b59b6]/15 text-[#9b59b6]">
+              {rule.target_field || '?'}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-gray-600 font-mono block truncate">{rule.content}</span>
       </div>
+      <button
+        className="text-gray-600 hover:text-gray-300 transition-colors p-0.5"
+        onClick={startEdit}
+        title="Editar regra"
+      >
+        <Pencil size={12} />
+      </button>
       <Toggle checked={rule.is_active} onChange={v => onToggle(rule.id, v)} size="sm" />
       <button
         className="text-gray-600 hover:text-red-400 transition-colors p-0.5"
@@ -305,6 +384,8 @@ export default function Settings() {
   const [fieldMaxTokens, setFieldMaxTokens] = useState<Record<string, number>>({})
   const [newRuleName, setNewRuleName] = useState('')
   const [newRuleContent, setNewRuleContent] = useState('')
+  const [newRuleScope, setNewRuleScope] = useState<'global' | 'per_field'>('global')
+  const [newRuleTargetField, setNewRuleTargetField] = useState('')
   const [saving, setSaving] = useState(false)
 
   const sensors = useSensors(useSensor(PointerSensor))
@@ -365,13 +446,23 @@ export default function Settings() {
     toast.success('Regra removida')
   }
 
+  const handleUpdateRule = async (id: number, data: Partial<GenerationRule>) => {
+    const updated = await rulesApi.update(id, data)
+    setRules(rs => rs.map(r => r.id === id ? updated : r))
+    toast.success('Regra atualizada')
+  }
+
   const handleAddRule = async () => {
     if (!newRuleName.trim() || !newRuleContent.trim()) return
     const rule = await rulesApi.create({
       name: newRuleName, content: newRuleContent,
-      scope: 'global', is_active: true, order_index: rules.length,
+      scope: newRuleScope,
+      target_field: newRuleScope === 'per_field' ? (newRuleTargetField || undefined) : undefined,
+      is_active: true, order_index: rules.length,
     })
     setRules(rs => [...rs, rule])
+    setNewRuleScope('global')
+    setNewRuleTargetField('')
     setNewRuleName('')
     setNewRuleContent('')
     toast.success('Regra adicionada')
@@ -505,7 +596,13 @@ export default function Settings() {
           <SortableContext items={rules.map(r => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {rules.map(rule => (
-                <SortableRule key={rule.id} rule={rule} onToggle={handleToggleRule} onDelete={handleDeleteRule} />
+                <SortableRule
+                  key={rule.id}
+                  rule={rule}
+                  onToggle={handleToggleRule}
+                  onDelete={handleDeleteRule}
+                  onUpdate={handleUpdateRule}
+                />
               ))}
             </div>
           </SortableContext>
@@ -524,6 +621,20 @@ export default function Settings() {
             value={newRuleContent}
             onChange={e => setNewRuleContent(e.target.value)}
           />
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              value={newRuleScope}
+              onChange={e => setNewRuleScope(e.target.value as 'global' | 'per_field')}
+              options={SCOPE_OPTIONS}
+            />
+            {newRuleScope === 'per_field' && (
+              <Select
+                value={newRuleTargetField}
+                onChange={e => setNewRuleTargetField(e.target.value)}
+                options={RULE_FIELD_OPTIONS}
+              />
+            )}
+          </div>
           <Button size="sm" variant="secondary" onClick={handleAddRule}>
             <Plus size={13} /> Adicionar Regra
           </Button>
