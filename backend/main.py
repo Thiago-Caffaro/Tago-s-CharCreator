@@ -7,7 +7,8 @@ from .config import settings
 from .database import create_db_and_tables, engine
 from .routers import projects, context_cards, rules, presets, lorebook, generation, settings as settings_router
 from .routers import card_types
-from .models import GenerationRule, RuleScope, FieldPreset, CardTypeConfig
+from .models import FieldPreset, CardTypeConfig
+from .services.default_data import seed_default_rules
 
 BUILTIN_CARD_TYPES = [
     ("appearance",    "Aparência",        "#3498db", 0),
@@ -20,16 +21,6 @@ BUILTIN_CARD_TYPES = [
     ("creator_notes", "Notas do Criador", "#95a5a6", 7),
     ("custom",        "Personalizado",    "#ecf0f1", 8),
 ]
-
-
-def _seed_rule(session: Session, name: str, content: str, scope: RuleScope,
-               is_active: bool, order_index: int, target_field=None):
-    exists = session.exec(select(GenerationRule).where(GenerationRule.name == name)).first()
-    if not exists:
-        session.add(GenerationRule(
-            name=name, content=content, scope=scope,
-            is_active=is_active, order_index=order_index, target_field=target_field,
-        ))
 
 
 def _seed_preset(session: Session, name: str, target_field: str,
@@ -45,18 +36,7 @@ def _seed_preset(session: Session, name: str, target_field: str,
 
 def seed_default_data(session: Session):
     # ── Generation Rules ────────────────────────────────────────────────────
-    _seed_rule(session, "Maioridade",
-               "All characters are 18 years old or older. Never imply or describe minors.",
-               RuleScope.GLOBAL, True, 0)
-    _seed_rule(session, "Placeholder {{char}}",
-               "Use {{char}} for the character name — never the literal name.",
-               RuleScope.GLOBAL, True, 1)
-    _seed_rule(session, "Placeholder {{user}}",
-               "Use {{user}} for the user — never a specific name.",
-               RuleScope.GLOBAL, True, 2)
-    _seed_rule(session, "Formato JSON",
-               "Return valid JSON in chara_card_v2 format, spec_version 2.0. No markdown fences.",
-               RuleScope.GLOBAL, True, 3)
+    seed_default_rules(session)
 
     # ── Description Presets ─────────────────────────────────────────────────
     _seed_preset(session,

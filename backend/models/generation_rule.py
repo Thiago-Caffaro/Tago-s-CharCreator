@@ -15,14 +15,23 @@ class GenerationRuleBase(SQLModel):
     target_field: Optional[str] = None
     is_active: bool = True
     order_index: int = 0
+    # Only ever set by the default-rule seeder — protects rules like the 18+
+    # safety rule from being permanently deleted with one accidental click.
+    is_builtin: bool = False
 
 
 class GenerationRule(GenerationRuleBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
 
-class GenerationRuleCreate(GenerationRuleBase):
-    pass
+class GenerationRuleCreate(SQLModel):
+    name: str
+    content: str
+    scope: RuleScope = RuleScope.GLOBAL
+    target_field: Optional[str] = None
+    is_active: bool = True
+    order_index: int = 0
+    # is_builtin intentionally excluded — user-created rules can never claim it
 
 
 class GenerationRuleUpdate(SQLModel):

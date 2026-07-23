@@ -6,7 +6,7 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw, Pencil } from 'lucide-react'
+import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw, Pencil, Lock, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { rulesApi } from '../api/rules'
@@ -351,12 +351,18 @@ function SortableRule({
         <Pencil size={12} />
       </button>
       <Toggle checked={rule.is_active} onChange={v => onToggle(rule.id, v)} size="sm" />
-      <button
-        className="text-gray-600 hover:text-red-400 transition-colors p-0.5"
-        onClick={() => onDelete(rule.id)}
-      >
-        <Trash2 size={13} />
-      </button>
+      {rule.is_builtin ? (
+        <span className="p-0.5" title="Regra nativa — não pode ser excluída">
+          <Lock size={12} className="text-gray-700" />
+        </span>
+      ) : (
+        <button
+          className="text-gray-600 hover:text-red-400 transition-colors p-0.5"
+          onClick={() => onDelete(rule.id)}
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
     </div>
   )
 }
@@ -441,9 +447,29 @@ export default function Settings() {
   }
 
   const handleDeleteRule = async (id: number) => {
-    await rulesApi.delete(id)
-    setRules(rs => rs.filter(r => r.id !== id))
-    toast.success('Regra removida')
+    try {
+      await rulesApi.delete(id)
+      setRules(rs => rs.filter(r => r.id !== id))
+      toast.success('Regra removida')
+    } catch {
+      toast.error('Erro ao remover regra')
+    }
+  }
+
+  const [restoringDefaults, setRestoringDefaults] = useState(false)
+  const handleResetDefaults = async () => {
+    setRestoringDefaults(true)
+    try {
+      const before = rules.length
+      const updated = await rulesApi.resetDefaults()
+      setRules(updated)
+      const restored = updated.length - before
+      toast.success(restored > 0 ? `${restored} regra${restored !== 1 ? 's' : ''} restaurada${restored !== 1 ? 's' : ''}` : 'Nenhuma regra nativa estava faltando')
+    } catch {
+      toast.error('Erro ao restaurar regras padrão')
+    } finally {
+      setRestoringDefaults(false)
+    }
   }
 
   const handleUpdateRule = async (id: number, data: Partial<GenerationRule>) => {
@@ -589,9 +615,21 @@ export default function Settings() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-300 border-b border-[#2a2a2a] pb-2">
-          Regras Globais de Geração
-        </h2>
+        <div className="flex items-center justify-between border-b border-[#2a2a2a] pb-2">
+          <h2 className="text-sm font-semibold text-gray-300">
+            Regras Globais de Geração
+          </h2>
+          <button
+            onClick={handleResetDefaults}
+            disabled={restoringDefaults}
+            className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-gray-300
+              disabled:opacity-50 transition-colors"
+            title="Recria qualquer regra nativa que tenha sido excluída — não altera regras existentes"
+          >
+            <RotateCcw size={11} className={restoringDefaults ? 'animate-spin' : ''} />
+            Restaurar padrões
+          </button>
+        </div>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleRuleDragEnd}>
           <SortableContext items={rules.map(r => r.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">

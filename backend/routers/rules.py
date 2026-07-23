@@ -10,6 +10,7 @@ from ..models.generation_rule import (
     GenerationRuleUpdate,
     ReorderItem,
 )
+from ..services.default_data import seed_default_rules
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
@@ -46,6 +47,8 @@ def delete_rule(rule_id: int, session: Session = Depends(get_session)):
     rule = session.get(GenerationRule, rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
+    if rule.is_builtin:
+        raise HTTPException(status_code=400, detail="Regras nativas não podem ser deletadas")
     session.delete(rule)
     session.commit()
 
@@ -58,3 +61,11 @@ def reorder_rules(items: List[ReorderItem], session: Session = Depends(get_sessi
             rule.order_index = item.order_index
             session.add(rule)
     session.commit()
+
+
+@router.post("/reset-defaults", response_model=List[GenerationRuleRead])
+def reset_default_rules(session: Session = Depends(get_session)):
+    """Re-creates any builtin rule that was deleted. Never overwrites an existing rule's content."""
+    seed_default_rules(session)
+    session.commit()
+    return session.exec(select(GenerationRule).order_by(GenerationRule.order_index)).all()

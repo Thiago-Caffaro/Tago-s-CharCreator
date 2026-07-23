@@ -43,6 +43,7 @@ export interface GenerationRule {
   target_field?: string
   is_active: boolean
   order_index: number
+  is_builtin: boolean
 }
 
 export interface FieldPreset {
