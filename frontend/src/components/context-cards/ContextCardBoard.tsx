@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import type { ContextCard as ContextCardType } from '../../types'
 import { ContextCard } from './ContextCard'
 import { AddCardMenu } from './AddCardMenu'
+import { SearchInput } from '../ui/SearchInput'
 import { useContextCardStore } from '../../store/useContextCardStore'
 
 interface Props {
@@ -27,6 +28,15 @@ interface Props {
 
 export function ContextCardBoard({ projectId, onSelectCard }: Props) {
   const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards } = useContextCardStore()
+  const [search, setSearch] = useState('')
+
+  const query = search.trim().toLowerCase()
+  const filteredCards = query
+    ? cards.filter(c =>
+        c.title.toLowerCase().includes(query) ||
+        c.content.toLowerCase().includes(query)
+      )
+    : cards
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -78,17 +88,22 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
 
   return (
     <div className="flex-1 overflow-auto p-5">
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider shrink-0">
           Context Cards ({cards.filter(c => c.is_active).length}/{cards.length} ativos)
         </span>
-        <AddCardMenu onAdd={handleAdd} />
+        <div className="flex items-center gap-2">
+          {cards.length > 0 && (
+            <SearchInput value={search} onChange={setSearch} placeholder="Buscar card..." className="w-44" />
+          )}
+          <AddCardMenu onAdd={handleAdd} />
+        </div>
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={cards.map(c => c.id)} strategy={rectSortingStrategy}>
+        <SortableContext items={filteredCards.map(c => c.id)} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-            {cards.map(card => (
+            {filteredCards.map(card => (
               <ContextCard
                 key={card.id}
                 card={card}
@@ -106,6 +121,12 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <p className="text-gray-500 text-sm">Nenhum context card ainda</p>
           <p className="text-gray-700 text-xs mt-1">Clique em "Adicionar Card" para começar</p>
+        </div>
+      )}
+
+      {cards.length > 0 && filteredCards.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-gray-500 text-sm">Nenhum card encontrado para "{search.trim()}"</p>
         </div>
       )}
     </div>

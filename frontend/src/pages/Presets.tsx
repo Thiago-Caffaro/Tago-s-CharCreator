@@ -12,6 +12,7 @@ import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
 import { Textarea } from '../components/ui/Textarea'
 import { Toggle } from '../components/ui/Toggle'
+import { SearchInput } from '../components/ui/SearchInput'
 import { PresetCard } from '../components/presets/PresetCard'
 import { PresetEditor } from '../components/presets/PresetEditor'
 import { CardTypeCard } from '../components/presets/CardTypeCard'
@@ -39,6 +40,7 @@ function PresetsTab() {
   const [presets, setPresets] = useState<FieldPreset[]>([])
   const [selected, setSelected] = useState<FieldPreset | null>(null)
   const [fieldFilter, setFieldFilter] = useState('')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
@@ -92,9 +94,13 @@ function PresetsTab() {
     }
   }
 
-  const filtered = fieldFilter
-    ? presets.filter(p => p.target_field === fieldFilter)
-    : presets
+  const searchQuery = search.trim().toLowerCase()
+  const filtered = presets.filter(p =>
+    (!fieldFilter || p.target_field === fieldFilter) &&
+    (!searchQuery ||
+      p.name.toLowerCase().includes(searchQuery) ||
+      p.system_prompt_override.toLowerCase().includes(searchQuery))
+  )
 
   // group by field
   const groups = filtered.reduce<Record<string, FieldPreset[]>>((acc, p) => {
@@ -170,6 +176,7 @@ function PresetsTab() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar preset..." className="w-48" />
           <span className="text-xs text-gray-600">
             {filtered.length} preset{filtered.length !== 1 ? 's' : ''}
           </span>
@@ -207,8 +214,14 @@ function PresetsTab() {
           ) : Object.keys(groups).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Layers size={40} className="text-gray-700 mb-3" />
-              <p className="text-gray-500 text-sm">Nenhum preset ainda</p>
-              <p className="text-gray-700 text-xs mt-1">Clique em "Novo Preset" para começar</p>
+              {presets.length === 0 ? (
+                <>
+                  <p className="text-gray-500 text-sm">Nenhum preset ainda</p>
+                  <p className="text-gray-700 text-xs mt-1">Clique em "Novo Preset" para começar</p>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">Nenhum preset encontrado</p>
+              )}
             </div>
           ) : (
             <div className="space-y-6">

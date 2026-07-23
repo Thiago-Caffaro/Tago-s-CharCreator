@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
+import { SearchInput } from '../components/ui/SearchInput'
 import type { Project } from '../types'
 
 export default function Dashboard() {
@@ -19,9 +20,18 @@ export default function Dashboard() {
   const [form, setForm] = useState({ name: '', character_name: '', description: '' })
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [search, setSearch] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchProjects() }, [])
+
+  const query = search.trim().toLowerCase()
+  const filteredProjects = query
+    ? projects.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        p.character_name.toLowerCase().includes(query)
+      )
+    : projects
 
   const handleCreate = async () => {
     if (!form.name.trim()) return
@@ -104,7 +114,9 @@ export default function Dashboard() {
         <div>
           <h1 className="text-lg lg:text-xl font-semibold text-gray-100">Projetos</h1>
           <p className="text-xs lg:text-sm text-gray-500 mt-0.5">
-            {projects.length} projeto{projects.length !== 1 ? 's' : ''}
+            {query
+              ? `${filteredProjects.length} de ${projects.length} projeto${projects.length !== 1 ? 's' : ''}`
+              : `${projects.length} projeto${projects.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -146,6 +158,18 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Search */}
+      {!loading && projects.length > 0 && (
+        <div className="mb-4 lg:mb-5">
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por nome do projeto ou personagem..."
+            className="lg:max-w-xs"
+          />
+        </div>
+      )}
+
       {/* States */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -162,11 +186,15 @@ export default function Dashboard() {
             <Plus size={15} /> Criar Projeto
           </Button>
         </div>
+      ) : filteredProjects.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <p className="text-gray-500 text-sm">Nenhum projeto encontrado para "{search.trim()}"</p>
+        </div>
       ) : (
         <>
         {/* Desktop grid */}
         <div className="hidden lg:grid grid-cols-2 xl:grid-cols-3 gap-4">
-          {projects.map(project => (
+          {filteredProjects.map(project => (
             <div
               key={project.id}
               className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 hover:border-[#9b59b6]/40 transition-colors cursor-pointer group"
@@ -233,7 +261,7 @@ export default function Dashboard() {
 
         {/* Mobile list */}
         <div className="lg:hidden space-y-3">
-          {projects.map(project => (
+          {filteredProjects.map(project => (
             <div
               key={project.id}
               className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-4
