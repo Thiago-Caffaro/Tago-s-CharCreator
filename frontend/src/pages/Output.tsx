@@ -16,7 +16,8 @@ import { validate_card_client, patchCardClient } from '../utils/validators'
 import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
 import { presetsApi } from '../api/presets'
-import type { FieldPreset } from '../types'
+import { lorebookApi } from '../api/lorebook'
+import type { FieldPreset, LorebookEntry } from '../types'
 import { CHARA_FIELDS } from '../types'
 
 const FIELD_LABELS: Record<string, string> = {
@@ -50,6 +51,12 @@ export default function Output() {
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const [lorebookEntries, setLorebookEntries] = useState<LorebookEntry[]>([])
+
+  useEffect(() => {
+    if (!projectId) return
+    lorebookApi.list(Number(projectId)).then(setLorebookEntries).catch(() => {})
+  }, [projectId])
 
   // Desktop export dropdown — kept separate from `exportOpen` (mobile
   // BottomSheet) since both toolbars are mounted at once behind lg:/hidden
@@ -326,7 +333,7 @@ export default function Output() {
               <div className="absolute right-0 mt-1 w-44 rounded-lg border border-[#333] bg-[#1e1e1e]
                 shadow-xl overflow-hidden z-50">
                 <button
-                  onClick={() => { exportCard(generatedCard, currentProject?.character_name || 'character'); setDesktopExportOpen(false) }}
+                  onClick={() => { exportCard(generatedCard, currentProject?.character_name || 'character', lorebookEntries); setDesktopExportOpen(false) }}
                   className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
                     hover:bg-[#2a2a2a] transition-colors"
                 >
@@ -337,7 +344,7 @@ export default function Output() {
                   onClick={async () => {
                     setDesktopExportOpen(false)
                     try {
-                      await exportCardAsPng(generatedCard, avatarDataUrl, currentProject?.character_name || 'character')
+                      await exportCardAsPng(generatedCard, avatarDataUrl, currentProject?.character_name || 'character', lorebookEntries)
                     } catch { toast.error('Erro ao exportar PNG') }
                   }}
                   className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-gray-300
@@ -347,6 +354,11 @@ export default function Output() {
                   <span className="flex-1 text-left">Download .png</span>
                   {!avatarDataUrl && <span className="text-[10px] text-gray-600 ml-1">placeholder</span>}
                 </button>
+                {lorebookEntries.length > 0 && (
+                  <p className="px-3 py-2 text-[10px] text-gray-600 border-t border-[#2a2a2a]">
+                    Inclui {lorebookEntries.length} entrada{lorebookEntries.length !== 1 ? 's' : ''} do lorebook
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -558,8 +570,13 @@ export default function Output() {
       {/* Export bottom sheet */}
       <BottomSheet open={exportOpen} onClose={() => setExportOpen(false)} title="Exportar Card">
         <div className="px-3 py-3 space-y-2">
+          {lorebookEntries.length > 0 && (
+            <p className="px-1 text-[11px] text-gray-500">
+              Inclui {lorebookEntries.length} entrada{lorebookEntries.length !== 1 ? 's' : ''} do lorebook
+            </p>
+          )}
           <button
-            onClick={() => { exportCard(generatedCard!, currentProject?.character_name || 'character'); setExportOpen(false) }}
+            onClick={() => { exportCard(generatedCard!, currentProject?.character_name || 'character', lorebookEntries); setExportOpen(false) }}
             className="flex items-center gap-4 w-full px-4 py-4 rounded-xl bg-[#242424] active:bg-[#2a2a2a]"
           >
             <FileJson size={20} className="text-[#9b59b6]" />
@@ -572,7 +589,7 @@ export default function Output() {
             onClick={async () => {
               setExportOpen(false)
               try {
-                await exportCardAsPng(generatedCard!, avatarDataUrl, currentProject?.character_name || 'character')
+                await exportCardAsPng(generatedCard!, avatarDataUrl, currentProject?.character_name || 'character', lorebookEntries)
               } catch { toast.error('Erro ao exportar PNG') }
             }}
             className="flex items-center gap-4 w-full px-4 py-4 rounded-xl bg-[#242424] active:bg-[#2a2a2a]"

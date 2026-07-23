@@ -1,9 +1,68 @@
-import type { CharaCardV2 } from '../types'
+import type { CharaCardV2, LorebookEntry, LorebookV2 } from '../types'
+
+// ─── Lorebook embedding ────────────────────────────────────────────────────────
+
+/**
+ * Converts the app's flat LorebookEntry rows (keys/secondary_keys stored as
+ * JSON-string columns) into the spec's embedded character_book shape. Mirrors
+ * the field defaults used by the standalone /lorebook/export endpoint so a
+ * card exported here and a lorebook exported separately stay consistent.
+ */
+function buildCharacterBook(entries: LorebookEntry[], characterName: string): LorebookV2 {
+  return {
+    name: `${characterName} — Lorebook`,
+    description: '',
+    scan_depth: 4,
+    token_budget: 2048,
+    recursive_scanning: false,
+    extensions: {},
+    entries: entries.map(e => ({
+      id: e.id,
+      name: e.name,
+      keys: safeParseArray(e.keys),
+      secondary_keys: safeParseArray(e.secondary_keys),
+      content: e.content,
+      enabled: e.enabled,
+      insertion_order: e.insertion_order,
+      position: e.position,
+      constant: e.constant,
+      selective: e.selective,
+      probability: e.probability,
+      comment: e.comment,
+      extensions: {
+        depth: e.depth,
+        weight: 100,
+        addMemo: true,
+        useProbability: true,
+        excludeRecursion: false,
+      },
+      selectiveLogic: 0,
+    })),
+  }
+}
+
+function safeParseArray(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+/** Returns a copy of card with character_book attached, or card as-is if there's nothing to embed. */
+function withLorebook(card: CharaCardV2, lorebookEntries: LorebookEntry[] | undefined): CharaCardV2 {
+  if (!lorebookEntries || lorebookEntries.length === 0) return card
+  return {
+    ...card,
+    data: { ...card.data, character_book: buildCharacterBook(lorebookEntries, card.data.name) },
+  }
+}
 
 // ─── JSON export ─────────────────────────────────────────────────────────────
 
-export function exportCard(card: CharaCardV2, characterName: string) {
-  const json = JSON.stringify(card, null, 2)
+export function exportCard(card: CharaCardV2, characterName: string, lorebookEntries?: LorebookEntry[]) {
+  const json = JSON.stringify(withLorebook(card, lorebookEntries), null, 2)
   const blob = new Blob([json], { type: 'application/json' })
   triggerDownload(blob, `${characterName || 'character'}_card.json`)
 }
@@ -22,8 +81,9 @@ export async function exportCardAsPng(
   card: CharaCardV2,
   avatarDataUrl: string | null,
   characterName: string,
+  lorebookEntries?: LorebookEntry[],
 ) {
-  const jsonStr = JSON.stringify(card)
+  const jsonStr = JSON.stringify(withLorebook(card, lorebookEntries))
   // base64-encode the JSON (btoa chokes on non-latin chars → encode first)
   const b64Json = btoa(unescape(encodeURIComponent(jsonStr)))
 
