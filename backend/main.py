@@ -34,6 +34,32 @@ def _seed_preset(session: Session, name: str, target_field: str,
         ))
 
 
+_LEGACY_PRESET_NAMES = [
+    ("Standard", "description"),
+    ("Detailed NSFW", "description"),
+    ("3 Blocks Standard", "mes_example"),
+    ("Bold/Em-dash Format", "mes_example"),
+]
+
+
+def _remove_legacy_presets(session: Session) -> int:
+    """One-time cleanup, safe to run on every startup: deletes the old
+    preset rows by exact name+field match if still present. No-ops once
+    they're gone, so this never needs to be removed later.
+    """
+    removed = 0
+    for name, target_field in _LEGACY_PRESET_NAMES:
+        preset = session.exec(
+            select(FieldPreset).where(
+                FieldPreset.name == name, FieldPreset.target_field == target_field
+            )
+        ).first()
+        if preset:
+            session.delete(preset)
+            removed += 1
+    return removed
+
+
 def seed_default_data(session: Session):
     # ── Generation Rules ────────────────────────────────────────────────────
     seed_default_rules(session)
@@ -376,24 +402,12 @@ WRONG behavioral anchor (description — don't write this):
 - Phrased as a live instruction, not a character sheet entry""",
     )
 
-    # ── Legacy Presets (backward compat — seeded only if names don't exist) ─
-    _seed_preset(session, "Standard", "description",
-                 "You are an expert SillyTavern character card author.\n"
-                 "Write a complete description using <== Section Name ==> headers.\n"
-                 "Use dual-nature structure: surface state / hidden state / trigger.\n"
-                 "Write behaviors, not adjective lists. 400-900 words.", True)
-    _seed_preset(session, "Detailed NSFW", "description",
-                 "You are an expert SillyTavern character card author specializing in adult cards.\n"
-                 "Write a detailed NSFW description with explicit anatomy. Use <== Section Name ==> headers.\n"
-                 "Include Sexual Nature section. Be specific — vague anatomy produces vague output.", False)
-    _seed_preset(session, "3 Blocks Standard", "mes_example",
-                 "You are an expert SillyTavern character card author.\n"
-                 "Write exactly 3 <START> blocks: Block 1 everyday, Block 2 pre-threshold, Block 3 post-threshold.\n"
-                 "Use **bold** for action, — em-dash for dialogue. Demonstrate character voice in every block.", True)
-    _seed_preset(session, "Bold/Em-dash Format", "mes_example",
-                 "You are an expert SillyTavern character card author.\n"
-                 "Write 3+ <START> blocks using **bold** for all action and — em-dash before all dialogue.\n"
-                 "Block 3 must be written at full explicit intensity — no fade-out.", False)
+    # Presets superseded by the "Description — Standard/NSFW" etc. set above
+    # used to be re-seeded here forever under their old names ("Standard",
+    # "3 Blocks Standard", ...) — removed one time below rather than kept
+    # cluttering the list indefinitely with no visible difference from the
+    # current ones.
+    _remove_legacy_presets(session)
 
     # ── Built-in Card Types ─────────────────────────────────────────────────
     for slug, label, color, order in BUILTIN_CARD_TYPES:
