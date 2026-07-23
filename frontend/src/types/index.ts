@@ -19,6 +19,7 @@ export interface Project {
   created_at: string
   updated_at: string
   last_generated_card?: string
+  avatar?: string
 }
 
 export interface ContextCard {

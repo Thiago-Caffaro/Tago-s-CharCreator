@@ -82,6 +82,7 @@ def export_project(project_id: int, session: Session = Depends(get_session)):
             "description": project.description,
             "character_name": project.character_name,
             "last_generated_card": project.last_generated_card,
+            "avatar": project.avatar,
         },
         "context_cards": [
             {
@@ -123,6 +124,7 @@ def import_project(data: dict, session: Session = Depends(get_session)):
         description=p.get("description"),
         character_name=p.get("character_name", ""),
         last_generated_card=p.get("last_generated_card"),
+        avatar=p.get("avatar"),
     )
     session.add(project)
     session.flush()  # get project.id without committing

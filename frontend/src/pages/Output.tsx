@@ -145,6 +145,15 @@ export default function Output() {
     }
   }, [projectId])
 
+  // Load the persisted avatar once the project arrives — previously this was
+  // purely local state, so it vanished on every navigation/reload and had to
+  // be re-uploaded each time.
+  useEffect(() => {
+    if (currentProject && currentProject.id === Number(projectId)) {
+      setAvatarDataUrl(currentProject.avatar ?? null)
+    }
+  }, [currentProject, projectId])
+
   useEffect(() => {
     if (generatedCard) {
       setJsonText(JSON.stringify(generatedCard, null, 2))
@@ -266,7 +275,17 @@ export default function Output() {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return }
     const reader = new FileReader()
-    reader.onload = ev => setAvatarDataUrl(ev.target?.result as string)
+    reader.onload = async ev => {
+      const dataUrl = ev.target?.result as string
+      setAvatarDataUrl(dataUrl)
+      if (projectId) {
+        try {
+          await updateProject(Number(projectId), { avatar: dataUrl })
+        } catch {
+          toast.error('Avatar carregado, mas não foi possível salvá-lo no projeto')
+        }
+      }
+    }
     reader.readAsDataURL(file)
     e.target.value = ''
   }

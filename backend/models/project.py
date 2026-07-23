@@ -11,6 +11,10 @@ class ProjectBase(SQLModel):
     name: str
     description: Optional[str] = None
     character_name: str = ""
+    # Base64 data URL (e.g. "data:image/png;base64,...") — stored inline like
+    # last_generated_card rather than as a separate file, consistent with the
+    # rest of this app's no-file-storage design.
+    avatar: Optional[str] = None
 
 
 class Project(ProjectBase, table=True):
@@ -32,6 +36,7 @@ class ProjectUpdate(SQLModel):
     description: Optional[str] = None
     character_name: Optional[str] = None
     last_generated_card: Optional[str] = None
+    avatar: Optional[str] = None
 
 
 class ProjectRead(ProjectBase):
