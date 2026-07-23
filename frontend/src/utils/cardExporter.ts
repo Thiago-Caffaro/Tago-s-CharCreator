@@ -41,7 +41,7 @@ function buildCharacterBook(entries: LorebookEntry[], characterName: string): Lo
   }
 }
 
-function safeParseArray(raw: string): string[] {
+export function safeParseArray(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw || '[]')
     return Array.isArray(parsed) ? parsed : []

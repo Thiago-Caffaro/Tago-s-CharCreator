@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Download, Trash2, Copy, Wand2, BookOpen, ChevronRight } from 'lucide-react'
+import { Plus, Download, Trash2, Copy, Wand2, BookOpen, ChevronRight, FlaskConical } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { lorebookApi } from '../api/lorebook'
 import { generationApi } from '../api/generation'
@@ -9,6 +9,7 @@ import { Modal } from '../components/ui/Modal'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { Textarea } from '../components/ui/Textarea'
 import { EntryForm } from '../components/lorebook/EntryForm'
+import { KeywordTester } from '../components/lorebook/KeywordTester'
 import type { LorebookEntry } from '../types'
 
 export default function Lorebook() {
@@ -22,6 +23,7 @@ export default function Lorebook() {
   const [generating, setGenerating] = useState(false)
   const [streamText, setStreamText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<LorebookEntry | null>(null)
+  const [showTester, setShowTester] = useState(false)
 
   const load = async () => {
     try {
@@ -134,6 +136,9 @@ export default function Lorebook() {
           Lorebook <span className="text-gray-600 font-normal">({entries.length})</span>
         </span>
         <div className="flex gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowTester(true)}>
+            <FlaskConical size={13} /> Testar Keywords
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowGenModal(true)}>
             <Wand2 size={13} /> Gerar Entries
           </Button>
@@ -159,6 +164,14 @@ export default function Lorebook() {
             <Download size={15} />
           </button>
         </a>
+        <button
+          onClick={() => setShowTester(true)}
+          className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#333]
+            bg-[#1e1e1e] text-gray-400 active:bg-[#2a2a2a] transition-colors"
+          title="Testar keywords"
+        >
+          <FlaskConical size={15} />
+        </button>
         <button
           onClick={() => setShowGenModal(true)}
           className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#333]
@@ -382,6 +395,8 @@ export default function Lorebook() {
         onConfirm={handleDelete}
         message={<>Deletar a entry <strong className="text-white">{confirmDelete?.name || 'sem nome'}</strong>?</>}
       />
+
+      <KeywordTester open={showTester} onClose={() => setShowTester(false)} entries={entries} />
     </div>
   )
 }
