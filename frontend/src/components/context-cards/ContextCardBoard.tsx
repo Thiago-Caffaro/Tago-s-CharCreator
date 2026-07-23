@@ -15,11 +15,13 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import toast from 'react-hot-toast'
+import { ListChecks, X } from 'lucide-react'
 import type { ContextCard as ContextCardType } from '../../types'
 import { ContextCard } from './ContextCard'
 import { AddCardMenu } from './AddCardMenu'
 import { SearchInput } from '../ui/SearchInput'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { Button } from '../ui/Button'
 import { useContextCardStore } from '../../store/useContextCardStore'
 
 interface Props {
@@ -31,6 +33,10 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
   const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards } = useContextCardStore()
   const [search, setSearch] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<ContextCardType | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [bulkWorking, setBulkWorking] = useState(false)
 
   const query = search.trim().toLowerCase()
   const filteredCards = query
@@ -39,6 +45,26 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
         c.content.toLowerCase().includes(query)
       )
     : cards
+
+  const selectedCards = cards.filter(c => selectedIds.has(c.id))
+
+  const toggleSelectMode = () => {
+    setSelectMode(m => !m)
+    setSelectedIds(new Set())
+  }
+
+  const toggleCheck = (card: ContextCardType) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(card.id)) next.delete(card.id)
+      else next.add(card.id)
+      return next
+    })
+  }
+
+  const selectAllFiltered = () => {
+    setSelectedIds(new Set(filteredCards.map(c => c.id)))
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -91,18 +117,78 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
     }
   }
 
+  const handleBulkToggle = async (active: boolean) => {
+    setBulkWorking(true)
+    try {
+      await Promise.all(selectedCards.map(c => updateCard(c.id, { is_active: active })))
+      toast.success(`${selectedCards.length} card(s) ${active ? 'ativado(s)' : 'desativado(s)'}`)
+      toggleSelectMode()
+    } catch {
+      toast.error('Erro ao atualizar cards')
+    } finally {
+      setBulkWorking(false)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkWorking(true)
+    try {
+      await Promise.all(selectedCards.map(c => deleteCard(c.id)))
+      toast.success(`${selectedCards.length} card(s) removido(s)`)
+      toggleSelectMode()
+    } catch {
+      toast.error('Erro ao remover cards')
+    } finally {
+      setBulkWorking(false)
+      setConfirmBulkDelete(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-5">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <span className="text-xs text-gray-500 font-medium uppercase tracking-wider shrink-0">
-          Context Cards ({cards.filter(c => c.is_active).length}/{cards.length} ativos)
-        </span>
-        <div className="flex items-center gap-2">
-          {cards.length > 0 && (
-            <SearchInput value={search} onChange={setSearch} placeholder="Buscar card..." className="w-44" />
-          )}
-          <AddCardMenu onAdd={handleAdd} />
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs text-gray-500 font-medium uppercase tracking-wider shrink-0">
+            Context Cards ({cards.filter(c => c.is_active).length}/{cards.length} ativos)
+          </span>
+          <div className="flex items-center gap-2">
+            {cards.length > 0 && (
+              <SearchInput value={search} onChange={setSearch} placeholder="Buscar card..." className="w-44" />
+            )}
+            {cards.length > 0 && (
+              <button
+                onClick={toggleSelectMode}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  selectMode ? 'text-[#9b59b6] bg-[#9b59b6]/10' : 'text-gray-500 hover:text-gray-300 hover:bg-[#242424]'
+                }`}
+                title={selectMode ? 'Cancelar seleção' : 'Selecionar vários'}
+              >
+                {selectMode ? <X size={15} /> : <ListChecks size={15} />}
+              </button>
+            )}
+            {!selectMode && <AddCardMenu onAdd={handleAdd} />}
+          </div>
         </div>
+
+        {selectMode && (
+          <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-[#2a2a2a]">
+            <span className="text-xs text-gray-400">
+              {selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}
+            </span>
+            <button onClick={selectAllFiltered} className="text-xs text-[#9b59b6] hover:underline">
+              Selecionar todos
+            </button>
+            <Button size="sm" variant="secondary" disabled={!selectedIds.size || bulkWorking} onClick={() => handleBulkToggle(true)}>
+              Ativar
+            </Button>
+            <Button size="sm" variant="secondary" disabled={!selectedIds.size || bulkWorking} onClick={() => handleBulkToggle(false)}>
+              Desativar
+            </Button>
+            <Button size="sm" variant="danger" disabled={!selectedIds.size || bulkWorking} onClick={() => setConfirmBulkDelete(true)}>
+              Deletar
+            </Button>
+          </div>
+        )}
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -116,6 +202,9 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
                 onToggle={handleToggle}
                 onDelete={setConfirmDelete}
                 onDuplicate={handleDuplicate}
+                selectMode={selectMode}
+                checked={selectedIds.has(card.id)}
+                onToggleCheck={toggleCheck}
               />
             ))}
           </div>
@@ -140,6 +229,13 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
         onCancel={() => setConfirmDelete(null)}
         onConfirm={handleDelete}
         message={<>Deletar o card <strong className="text-white">{confirmDelete?.title}</strong>?</>}
+      />
+
+      <ConfirmModal
+        open={confirmBulkDelete}
+        onCancel={() => setConfirmBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        message={<>Deletar <strong className="text-white">{selectedCards.length}</strong> card(s) selecionado(s)?</>}
       />
     </div>
   )
