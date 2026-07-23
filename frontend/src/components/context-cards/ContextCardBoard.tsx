@@ -26,7 +26,7 @@ interface Props {
 }
 
 export function ContextCardBoard({ projectId, onSelectCard }: Props) {
-  const { cards, createCard, updateCard, deleteCard, reorderCards } = useContextCardStore()
+  const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards } = useContextCardStore()
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -67,6 +67,15 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
     }
   }
 
+  const handleDuplicate = async (card: ContextCardType) => {
+    try {
+      await duplicateCard(projectId, card)
+      toast.success('Card duplicado')
+    } catch {
+      toast.error('Erro ao duplicar card')
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-5">
       <div className="flex items-center justify-between mb-4">
@@ -86,6 +95,7 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
                 onSelect={onSelectCard}
                 onToggle={handleToggle}
                 onDelete={handleDelete}
+                onDuplicate={handleDuplicate}
               />
             ))}
           </div>

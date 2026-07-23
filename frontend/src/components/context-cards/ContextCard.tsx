@@ -1,7 +1,7 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Trash2 } from 'lucide-react'
+import { GripVertical, Trash2, Copy } from 'lucide-react'
 import type { ContextCard as ContextCardType } from '../../types'
 import { useCardTypeStore } from '../../store/useCardTypeStore'
 import { ContextCardTypeIcon } from './ContextCardTypeIcon'
@@ -12,9 +12,10 @@ interface Props {
   onSelect: (card: ContextCardType) => void
   onToggle: (card: ContextCardType, active: boolean) => void
   onDelete: (card: ContextCardType) => void
+  onDuplicate: (card: ContextCardType) => void
 }
 
-export function ContextCard({ card, onSelect, onToggle, onDelete }: Props) {
+export function ContextCard({ card, onSelect, onToggle, onDelete, onDuplicate }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id })
 
@@ -51,6 +52,13 @@ export function ContextCard({ card, onSelect, onToggle, onDelete }: Props) {
             onChange={v => onToggle(card, v)}
             size="sm"
           />
+          <button
+            className="p-1 rounded text-gray-600 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+            onClick={() => onDuplicate(card)}
+            title="Duplicar card"
+          >
+            <Copy size={12} />
+          </button>
           <button
             className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"
             onClick={() => onDelete(card)}

@@ -47,6 +47,50 @@ def update_project(project_id: int, data: ProjectUpdate, session: Session = Depe
     return project
 
 
+@router.post("/{project_id}/duplicate", response_model=ProjectRead, status_code=201)
+def duplicate_project(project_id: int, session: Session = Depends(get_session)):
+    """Clones a project plus its context cards and lorebook entries.
+
+    Done server-side (not read-then-recreate on the client) so the copy is a
+    single atomic operation instead of N+1 round trips.
+    """
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    new_project = Project(
+        name=f"{project.name} (cópia)",
+        description=project.description,
+        character_name=project.character_name,
+        last_generated_card=project.last_generated_card,
+        avatar=project.avatar,
+    )
+    session.add(new_project)
+    session.flush()  # get new_project.id without committing
+
+    cards = session.exec(select(ContextCard).where(ContextCard.project_id == project_id)).all()
+    for c in cards:
+        session.add(ContextCard(
+            project_id=new_project.id,
+            title=c.title, card_type=c.card_type, content=c.content,
+            is_active=c.is_active, order_index=c.order_index, target_field=c.target_field,
+        ))
+
+    entries = session.exec(select(LorebookEntry).where(LorebookEntry.project_id == project_id)).all()
+    for e in entries:
+        session.add(LorebookEntry(
+            project_id=new_project.id,
+            name=e.name, keys=e.keys, secondary_keys=e.secondary_keys, content=e.content,
+            enabled=e.enabled, insertion_order=e.insertion_order, position=e.position,
+            constant=e.constant, selective=e.selective, probability=e.probability,
+            depth=e.depth, comment=e.comment,
+        ))
+
+    session.commit()
+    session.refresh(new_project)
+    return new_project
+
+
 @router.delete("/{project_id}", status_code=204)
 def delete_project(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)

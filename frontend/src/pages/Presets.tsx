@@ -134,6 +134,21 @@ function PresetsTab() {
     toast.success('Preset removido')
   }
 
+  const handleDuplicate = async (preset: FieldPreset) => {
+    try {
+      const p = await presetsApi.create({
+        name: `${preset.name} (cópia)`,
+        target_field: preset.target_field,
+        system_prompt_override: preset.system_prompt_override,
+        is_default: false,
+      })
+      setPresets(prev => [...prev, p])
+      toast.success('Preset duplicado!')
+    } catch {
+      toast.error('Erro ao duplicar preset')
+    }
+  }
+
   const handleToggleDefault = async (preset: FieldPreset) => {
     const updated = await presetsApi.update(preset.id, { is_default: !preset.is_default })
     setPresets(prev => prev.map(p => p.id === preset.id ? updated : p))
@@ -213,6 +228,7 @@ function PresetsTab() {
                         preset={p}
                         onSelect={setSelected}
                         onDelete={handleDelete}
+                        onDuplicate={handleDuplicate}
                         onToggleDefault={handleToggleDefault}
                       />
                     ))}
@@ -325,6 +341,19 @@ function TiposTab() {
     }
   }
 
+  const handleDuplicate = async (ct: CardTypeConfig) => {
+    try {
+      const slug = `${ct.slug}_copy_${Date.now().toString(36)}`
+      const created = await cardTypesApi.create({
+        slug, label: `${ct.label} (cópia)`, color: ct.color, order_index: ct.order_index,
+      })
+      setTypes(prev => [...prev, created])
+      toast.success('Tipo duplicado!')
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Erro ao duplicar tipo')
+    }
+  }
+
   const builtin = types.filter(t => t.is_builtin)
   const custom = types.filter(t => !t.is_builtin)
 
@@ -354,7 +383,7 @@ function TiposTab() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {builtin.map(ct => (
-                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} />
+                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} onDuplicate={handleDuplicate} />
                     ))}
                   </div>
                 </div>
@@ -367,7 +396,7 @@ function TiposTab() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {custom.map(ct => (
-                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} />
+                      <CardTypeCard key={ct.id} cardType={ct} onSelect={setSelected} onDelete={handleDelete} onDuplicate={handleDuplicate} />
                     ))}
                   </div>
                 </div>

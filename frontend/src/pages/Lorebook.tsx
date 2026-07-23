@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Download, Trash2, Wand2, BookOpen, ChevronRight } from 'lucide-react'
+import { Plus, Download, Trash2, Copy, Wand2, BookOpen, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { lorebookApi } from '../api/lorebook'
 import { generationApi } from '../api/generation'
@@ -55,6 +55,30 @@ export default function Lorebook() {
     setEntries(prev => prev.filter(x => x.id !== entry.id))
     if (selected?.id === entry.id) setSelected(null)
     toast.success('Entry removida')
+  }
+
+  const handleDuplicate = async (e: React.MouseEvent, entry: LorebookEntry) => {
+    e.stopPropagation()
+    try {
+      const created = await lorebookApi.create(id, {
+        name: `${entry.name} (cópia)`,
+        keys: entry.keys,
+        secondary_keys: entry.secondary_keys,
+        content: entry.content,
+        enabled: entry.enabled,
+        insertion_order: entry.insertion_order,
+        position: entry.position,
+        constant: entry.constant,
+        selective: entry.selective,
+        probability: entry.probability,
+        depth: entry.depth,
+        comment: entry.comment,
+      })
+      setEntries(prev => [...prev, created])
+      toast.success('Entry duplicada')
+    } catch {
+      toast.error('Erro ao duplicar entry')
+    }
   }
 
   const handleGenerate = async () => {
@@ -191,12 +215,21 @@ export default function Lorebook() {
                       </span>
                     </td>
                     <td className="py-2 px-3" onClick={e => e.stopPropagation()}>
-                      <button
-                        className="text-gray-600 hover:text-red-400 p-1 rounded transition-colors"
-                        onClick={e => handleDelete(e, entry)}
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          className="text-gray-600 hover:text-gray-300 p-1 rounded transition-colors"
+                          title="Duplicar entry"
+                          onClick={e => handleDuplicate(e, entry)}
+                        >
+                          <Copy size={12} />
+                        </button>
+                        <button
+                          className="text-gray-600 hover:text-red-400 p-1 rounded transition-colors"
+                          onClick={e => handleDelete(e, entry)}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -239,6 +272,13 @@ export default function Lorebook() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={e => handleDuplicate(e, entry)}
+                        className="flex items-center justify-center w-8 h-8 rounded-xl
+                          text-gray-600 active:bg-[#2a2a2a] active:text-gray-300 transition-colors"
+                      >
+                        <Copy size={14} />
+                      </button>
                       <button
                         onClick={e => handleDelete(e, entry)}
                         className="flex items-center justify-center w-8 h-8 rounded-xl

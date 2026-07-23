@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Folder, Trash2, Edit2, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
+import { Plus, Folder, Trash2, Edit2, Copy, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProjectStore } from '../store/useProjectStore'
 import { projectsApi } from '../api/projects'
@@ -12,7 +12,8 @@ import type { Project } from '../types'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { projects, loading, fetchProjects, createProject, deleteProject } = useProjectStore()
+  const { projects, loading, fetchProjects, createProject, duplicateProject, deleteProject } = useProjectStore()
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [form, setForm] = useState({ name: '', character_name: '', description: '' })
@@ -46,6 +47,19 @@ export default function Dashboard() {
       toast.success('Projeto deletado')
     } catch {
       toast.error('Erro ao deletar projeto')
+    }
+  }
+
+  const handleDuplicate = async (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation()
+    setDuplicatingId(project.id)
+    try {
+      const copy = await duplicateProject(project.id)
+      toast.success(`"${copy.name}" criado`)
+    } catch {
+      toast.error('Erro ao duplicar projeto')
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -180,6 +194,17 @@ export default function Dashboard() {
                     <Download size={13} />
                   </button>
                   <button
+                    title="Duplicar projeto"
+                    disabled={duplicatingId === project.id}
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors disabled:opacity-50"
+                    onClick={e => handleDuplicate(e, project)}
+                  >
+                    {duplicatingId === project.id
+                      ? <span className="block w-[13px] h-[13px] border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                      : <Copy size={13} />
+                    }
+                  </button>
+                  <button
                     className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
                     onClick={() => navigate(`/editor/${project.id}`)}
                   >
@@ -257,6 +282,18 @@ export default function Dashboard() {
                 >
                   <Download size={12} />
                   Exportar
+                </button>
+                <button
+                  onClick={e => handleDuplicate(e, project)}
+                  disabled={duplicatingId === project.id}
+                  className="flex items-center justify-center w-10 h-9 rounded-xl
+                    bg-[#242424] border border-[#2a2a2a] text-gray-600
+                    active:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+                >
+                  {duplicatingId === project.id
+                    ? <span className="block w-3.5 h-3.5 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                    : <Copy size={13} />
+                  }
                 </button>
                 <button
                   onClick={() => setConfirmDelete(project)}

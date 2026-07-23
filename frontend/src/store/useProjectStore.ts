@@ -10,6 +10,7 @@ interface ProjectStore {
   fetchProject: (id: number) => Promise<void>
   createProject: (data: { name: string; character_name: string; description?: string }) => Promise<Project>
   updateProject: (id: number, data: Partial<Project>) => Promise<void>
+  duplicateProject: (id: number) => Promise<Project>
   deleteProject: (id: number) => Promise<void>
   setCurrentProject: (project: Project | null) => void
 }
@@ -46,6 +47,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       projects: s.projects.map(p => (p.id === id ? updated : p)),
       currentProject: s.currentProject?.id === id ? updated : s.currentProject,
     }))
+  },
+
+  duplicateProject: async (id) => {
+    const project = await projectsApi.duplicate(id)
+    set(s => ({ projects: [project, ...s.projects] }))
+    return project
   },
 
   deleteProject: async (id) => {

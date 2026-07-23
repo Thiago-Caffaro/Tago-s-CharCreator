@@ -1,5 +1,5 @@
 import React from 'react'
-import { Trash2, Star, Tag } from 'lucide-react'
+import { Trash2, Star, Tag, Copy } from 'lucide-react'
 import type { FieldPreset } from '../../types'
 import { CHARA_FIELDS } from '../../types'
 
@@ -25,10 +25,11 @@ interface Props {
   preset: FieldPreset
   onSelect: (preset: FieldPreset) => void
   onDelete: (preset: FieldPreset) => void
+  onDuplicate: (preset: FieldPreset) => void
   onToggleDefault: (preset: FieldPreset) => void
 }
 
-export function PresetCard({ preset, onSelect, onDelete, onToggleDefault }: Props) {
+export function PresetCard({ preset, onSelect, onDelete, onDuplicate, onToggleDefault }: Props) {
   const color = fieldColor(preset.target_field)
 
   return (
@@ -64,6 +65,13 @@ export function PresetCard({ preset, onSelect, onDelete, onToggleDefault }: Prop
             onClick={() => onToggleDefault(preset)}
           >
             <Star size={13} fill={preset.is_default ? '#f39c12' : 'none'} />
+          </button>
+          <button
+            className="p-1 rounded text-gray-600 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+            title="Duplicar preset"
+            onClick={() => onDuplicate(preset)}
+          >
+            <Copy size={12} />
           </button>
           <button
             className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors"

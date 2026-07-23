@@ -1,5 +1,5 @@
 import React from 'react'
-import { Trash2, Lock } from 'lucide-react'
+import { Trash2, Lock, Copy } from 'lucide-react'
 import type { CardTypeConfig } from '../../api/cardTypes'
 import {
   Eye, Brain, Zap, Heart, Flame, Globe, Map, FileText, Puzzle,
@@ -21,9 +21,10 @@ interface Props {
   cardType: CardTypeConfig
   onSelect: (ct: CardTypeConfig) => void
   onDelete: (ct: CardTypeConfig) => void
+  onDuplicate: (ct: CardTypeConfig) => void
 }
 
-export function CardTypeCard({ cardType, onSelect, onDelete }: Props) {
+export function CardTypeCard({ cardType, onSelect, onDelete, onDuplicate }: Props) {
   const Icon = SLUG_ICONS[cardType.slug] ?? Puzzle
   const color = cardType.color
 
@@ -51,6 +52,13 @@ export function CardTypeCard({ cardType, onSelect, onDelete }: Props) {
           className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           onClick={e => e.stopPropagation()}
         >
+          <button
+            className="p-1 rounded text-gray-600 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+            title="Duplicar tipo"
+            onClick={() => onDuplicate(cardType)}
+          >
+            <Copy size={12} />
+          </button>
           {cardType.is_builtin ? (
             <span title="Tipo nativo — não pode ser excluído">
               <Lock size={11} className="text-gray-700" />
