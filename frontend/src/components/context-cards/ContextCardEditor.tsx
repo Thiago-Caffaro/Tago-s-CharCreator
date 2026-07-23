@@ -7,6 +7,7 @@ import { Input } from '../ui/Input'
 import { Textarea } from '../ui/Textarea'
 import { Select } from '../ui/Select'
 import { Button } from '../ui/Button'
+import { estimateTokens } from '../../utils/tokens'
 
 interface Props {
   card: ContextCard | null
@@ -32,6 +33,7 @@ export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
   // on every call and trip useSyncExternalStore's infinite-loop guard.
   const types = useCardTypeStore(s => s.types)
   const cardTypeOptions = types.map(t => ({ value: t.slug, label: t.label }))
+  const tokenEstimate = estimateTokens(title + content)
 
   useEffect(() => {
     if (card) {
@@ -73,7 +75,15 @@ export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
           <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
           <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value)} options={cardTypeOptions} />
           <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
-          <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={16} />
+          <div className="flex flex-col gap-1 flex-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-gray-400">Conteúdo</label>
+              <span className="text-[10px] text-gray-600" title="Estimativa de tokens deste card">
+                ~{tokenEstimate.toLocaleString()} tokens
+              </span>
+            </div>
+            <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={16} />
+          </div>
         </div>
         <div className="p-4 border-t border-[#2a2a2a] flex gap-2">
           <Button variant="secondary" onClick={onClose} className="flex-1">Fechar</Button>
@@ -101,7 +111,15 @@ export function ContextCardEditor({ card, onClose, onSave, desktop }: Props) {
         <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} placeholder="Nome do bloco..." />
         <Select label="Tipo" value={cardType} onChange={e => setCardType(e.target.value)} options={cardTypeOptions} />
         <Select label="Campo-alvo (opcional)" value={targetField} onChange={e => setTargetField(e.target.value)} options={FIELD_OPTIONS} />
-        <Textarea label="Conteúdo" value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={14} />
+        <div className="flex flex-col gap-1 flex-1">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-400">Conteúdo</label>
+            <span className="text-[10px] text-gray-600" title="Estimativa de tokens deste card">
+              ~{tokenEstimate.toLocaleString()} tokens
+            </span>
+          </div>
+          <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Descreva aqui as informações deste bloco de contexto..." rows={14} />
+        </div>
       </div>
     </div>
   )

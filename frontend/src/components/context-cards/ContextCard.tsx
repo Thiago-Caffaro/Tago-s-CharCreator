@@ -6,6 +6,7 @@ import type { ContextCard as ContextCardType } from '../../types'
 import { useCardTypeStore } from '../../store/useCardTypeStore'
 import { ContextCardTypeIcon } from './ContextCardTypeIcon'
 import { Toggle } from '../ui/Toggle'
+import { estimateTokens } from '../../utils/tokens'
 
 interface Props {
   card: ContextCardType
@@ -31,6 +32,7 @@ export function ContextCard({
   }
 
   const borderColor = useCardTypeStore(s => s.types.find(t => t.slug === card.card_type)?.color) ?? '#9b59b6'
+  const tokenEstimate = estimateTokens(card.title + card.content)
 
   return (
     <div
@@ -90,11 +92,14 @@ export function ContextCard({
           {card.content || <span className="italic text-gray-700">Vazio — clique para editar</span>}
         </p>
       </div>
-      {card.target_field && (
-        <div className="px-3 pb-2">
-          <span className="text-[10px] text-gray-600">→ {card.target_field}</span>
-        </div>
-      )}
+      <div className="px-3 pb-2 flex items-center justify-between gap-2">
+        {card.target_field ? (
+          <span className="text-[10px] text-gray-600 truncate">→ {card.target_field}</span>
+        ) : <span />}
+        <span className="text-[10px] text-gray-700 shrink-0" title="Estimativa de tokens deste card">
+          ~{tokenEstimate.toLocaleString()} tok
+        </span>
+      </div>
     </div>
   )
 }
