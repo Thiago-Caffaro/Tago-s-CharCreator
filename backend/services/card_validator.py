@@ -1,13 +1,17 @@
 import json
 from typing import Optional
 
-
-REQUIRED_FIELDS = [
+# Structural validation only — presence and type of each field. Quality
+# heuristics (word counts, section counts, format conventions) are
+# intentionally not duplicated here: those are advisory, not hard failures,
+# and already live in QualityChecklist.tsx as the single source of truth.
+STRING_FIELDS = [
     "name", "description", "personality", "first_mes", "mes_example",
     "scenario", "creator_notes", "system_prompt", "post_history_instructions",
-    "alternate_greetings", "tags", "talkativeness", "creator",
-    "character_version", "avatar",
+    "talkativeness", "creator", "character_version", "avatar",
 ]
+ARRAY_OF_STRING_FIELDS = ["alternate_greetings", "tags"]
+REQUIRED_FIELDS = STRING_FIELDS + ARRAY_OF_STRING_FIELDS
 
 
 def validate_card(json_str: str) -> tuple[bool, Optional[dict], list[str]]:
@@ -31,16 +35,24 @@ def validate_card(json_str: str) -> tuple[bool, Optional[dict], list[str]]:
         if field not in card_data:
             errors.append(f"Campo obrigatório ausente: '{field}'")
 
-    alt = card_data.get("alternate_greetings")
-    if alt is not None and not isinstance(alt, list):
-        errors.append("alternate_greetings deve ser um array")
+    # Catches a model returning e.g. a number or null for a text field —
+    # "field present" alone lets that slip through and breaks the exported
+    # card downstream (SillyTavern expects every one of these as a string).
+    for field in STRING_FIELDS:
+        value = card_data.get(field)
+        if value is not None and not isinstance(value, str):
+            errors.append(f"'{field}' deve ser texto (recebido {type(value).__name__})")
 
-    tags = card_data.get("tags")
-    if tags is not None and not isinstance(tags, list):
-        errors.append("tags deve ser um array")
+    for field in ARRAY_OF_STRING_FIELDS:
+        value = card_data.get(field)
+        if value is not None:
+            if not isinstance(value, list):
+                errors.append(f"'{field}' deve ser um array")
+            elif not all(isinstance(item, str) for item in value):
+                errors.append(f"'{field}' deve conter apenas strings")
 
-    mes_example = card_data.get("mes_example", "")
-    if mes_example and not mes_example.strip().startswith("<START>"):
+    mes_example = card_data.get("mes_example")
+    if isinstance(mes_example, str) and mes_example and not mes_example.strip().startswith("<START>"):
         errors.append("mes_example deve começar com <START>")
 
     return len(errors) == 0, data, errors

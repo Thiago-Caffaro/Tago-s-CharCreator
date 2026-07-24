@@ -389,6 +389,7 @@ export default function Settings() {
   const [provider, setProvider] = useState('')
   const [maxTokens, setMaxTokens] = useState(8192)
   const [temperature, setTemperature] = useState(1.0)
+  const [topP, setTopP] = useState(0.999)
   const [fieldMaxTokens, setFieldMaxTokens] = useState<Record<string, number>>({})
   const [newRuleName, setNewRuleName] = useState('')
   const [newRuleContent, setNewRuleContent] = useState('')
@@ -409,6 +410,7 @@ export default function Settings() {
       setProvider(settings.preferred_provider ?? '')
       setMaxTokens(settings.max_tokens)
       setTemperature(settings.temperature)
+      setTopP(settings.top_p)
       setFieldMaxTokens(settings.field_max_tokens ?? {})
     }
   }, [settings])
@@ -422,6 +424,7 @@ export default function Settings() {
         preferred_provider: provider,
         max_tokens: maxTokens,
         temperature,
+        top_p: topP,
         field_max_tokens: fieldMaxTokens,
       })
       setApiKey('')
@@ -555,6 +558,15 @@ export default function Settings() {
             max="2"
             value={temperature}
             onChange={e => setTemperature(Number(e.target.value))}
+          />
+          <Input
+            label="Top P"
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            value={topP}
+            onChange={e => setTopP(Number(e.target.value))}
           />
         </div>
 

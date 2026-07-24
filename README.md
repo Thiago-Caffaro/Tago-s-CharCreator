@@ -13,16 +13,18 @@ cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cd ..
 ```
 
-Copie `.env.example` para `.env` e configure sua API key:
+Copie `.env.example` para `.env` (na raiz do projeto) e configure sua API key:
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Inicie o backend:
+Inicie o backend a partir da raiz do projeto — os imports do backend são relativos,
+então precisa rodar como pacote (`backend.main:app`), não de dentro da pasta `backend/`:
 ```powershell
-uvicorn main:app --reload --app-dir .
+backend\venv\Scripts\python.exe -m uvicorn backend.main:app --reload
 ```
 O backend sobe em http://localhost:8000
 
@@ -40,7 +42,7 @@ O frontend sobe em http://localhost:5173
 
 ```bash
 cp .env.example .env
-# edite .env com sua ANTHROPIC_API_KEY
+# edite .env com sua OPENROUTER_API_KEY
 docker compose up -d
 ```
 
@@ -54,10 +56,14 @@ Acesse em http://localhost:3000
 - `docker-compose.yml` — deploy para homelab
 
 ## Features
-- **Context Cards** modulares com drag-and-drop
+- **Context Cards** modulares com drag-and-drop, templates reutilizáveis e ações em lote
 - Geração de card completo ou campo individual via streaming
 - Refinamento de campos com instrução customizada
-- Lorebook editor completo com geração por IA
+- "Voz" reutilizável do personagem — aplica um tom/estilo consistente a todos os campos
+- Configuração de geração (modelo/temperature/top_p) global ou por projeto
+- Lorebook editor completo com geração por IA, testador de keywords e import/export
 - Quality checklist automático para o card gerado
-- Exportação de `.json` compatível com SillyTavern
+- Histórico de gerações por projeto, com restauração de versões anteriores
+- Exportação de `.json` e `.png` (com avatar embutido) compatível com SillyTavern
+- Importação de character cards de outros apps (SillyTavern/Chub, `.png` ou `.json`)
 - Seed automático de regras globais e field presets
