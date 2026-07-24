@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import httpx
 
-from ..config import settings
+from ..config import settings, persist_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -65,37 +65,8 @@ def update_settings(data: SettingsUpdate):
     if data.field_max_tokens is not None:
         settings.field_max_tokens_json = _json.dumps(data.field_max_tokens)
 
-    _write_env()
+    persist_settings()
     return {"ok": True}
-
-
-def _write_env():
-    """Persist current settings to data/.env so they survive container restarts.
-
-    data/ is mounted as a Docker volume, so this file outlives the container
-    image. On the next start pydantic-settings loads it as an override on top
-    of any environment variables passed by Docker / Portainer.
-    """
-    import os, json as _json
-    os.makedirs("data", exist_ok=True)
-    lines = [
-        f"OPENROUTER_API_KEY={settings.openrouter_api_key}",
-        f"OPENROUTER_BASE_URL={settings.openrouter_base_url}",
-        f"DATABASE_URL={settings.database_url}",
-        f"CORS_ORIGINS={settings.cors_origins}",
-        f"DEFAULT_MODEL={settings.default_model}",
-        f"PREFERRED_PROVIDER={settings.preferred_provider}",
-        f"MAX_TOKENS={settings.max_tokens}",
-        f"TEMPERATURE={settings.temperature}",
-        f"TOP_P={settings.top_p}",
-        f"REPETITION_PENALTY={settings.repetition_penalty}",
-        f"FIELD_MAX_TOKENS_JSON={settings.field_max_tokens_json}",
-    ]
-    try:
-        with open("data/.env", "w", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
-    except Exception:
-        pass
 
 
 @router.get("/providers")

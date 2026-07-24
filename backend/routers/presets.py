@@ -39,6 +39,7 @@ def export_presets(session: Session = Depends(get_session)):
                 "target_field": p.target_field,
                 "system_prompt_override": p.system_prompt_override,
                 "is_default": p.is_default,
+                "is_voice": p.is_voice,
             }
             for p in presets
         ],
@@ -55,6 +56,7 @@ def import_presets(data: dict, session: Session = Depends(get_session)):
             target_field=p.get("target_field", "description"),
             system_prompt_override=p.get("system_prompt_override", ""),
             is_default=p.get("is_default", False),
+            is_voice=p.get("is_voice", False),
         ))
         created += 1
     session.commit()

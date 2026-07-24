@@ -6,10 +6,11 @@ import {
   SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw, Pencil, Lock, RotateCcw } from 'lucide-react'
+import { GripVertical, Plus, Trash2, Search, ExternalLink, RefreshCw, Pencil, Lock, RotateCcw, Download, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSettingsStore } from '../store/useSettingsStore'
 import { rulesApi } from '../api/rules'
+import { configApi } from '../api/config'
 import client from '../api/client'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -396,6 +397,8 @@ export default function Settings() {
   const [newRuleScope, setNewRuleScope] = useState<'global' | 'per_field'>('global')
   const [newRuleTargetField, setNewRuleTargetField] = useState('')
   const [saving, setSaving] = useState(false)
+  const [importingConfig, setImportingConfig] = useState(false)
+  const configImportRef = useRef<HTMLInputElement>(null)
 
   const sensors = useSensors(useSensor(PointerSensor))
 
@@ -433,6 +436,39 @@ export default function Settings() {
       toast.error('Erro ao salvar configurações')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleExportConfig = async () => {
+    try {
+      await configApi.exportConfig()
+      toast.success('Configurações exportadas!')
+    } catch {
+      toast.error('Erro ao exportar configurações')
+    }
+  }
+
+  const handleImportConfigFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImportingConfig(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.version) {
+        toast.error('Arquivo inválido — não é um backup de configurações')
+        return
+      }
+      const result = await configApi.importConfig(data)
+      await fetchSettings()
+      rulesApi.list().then(setRules).catch(() => {})
+      const { rules: nR = 0, presets: nP = 0, card_types: nC = 0, templates: nT = 0 } = result.imported || {}
+      toast.success(`Importado: ${nR} regra(s), ${nP} preset(s), ${nC} tipo(s) de card, ${nT} template(s)`)
+    } catch {
+      toast.error('Erro ao importar configurações')
+    } finally {
+      setImportingConfig(false)
     }
   }
 
@@ -502,6 +538,37 @@ export default function Settings() {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
       <h1 className="text-xl font-semibold text-gray-100">Configurações</h1>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold text-gray-300 border-b border-[#2a2a2a] pb-2">
+          Backup Completo
+        </h2>
+        <p className="text-xs text-gray-600">
+          Exporta configurações gerais, regras de geração, presets (incl. vozes), tipos de card e
+          templates em um único arquivo — a chave de API nunca é incluída. Use para migrar tudo
+          de uma vez para outra instalação, ou como backup.
+        </p>
+        <div className="flex gap-2">
+          <input
+            ref={configImportRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden"
+            onChange={handleImportConfigFile}
+          />
+          <Button variant="secondary" size="sm" onClick={handleExportConfig}>
+            <Download size={13} /> Exportar Tudo
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => configImportRef.current?.click()}
+            loading={importingConfig}
+          >
+            <Upload size={13} /> Importar Tudo
+          </Button>
+        </div>
+      </section>
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-300 border-b border-[#2a2a2a] pb-2">
