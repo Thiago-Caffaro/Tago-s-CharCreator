@@ -33,12 +33,14 @@ interface ORModel {
   name: string
 }
 
-function ModelPicker({
+export function ModelPicker({
   value,
   onChange,
+  label = 'Modelo padrão',
 }: {
   value: string
   onChange: (v: string) => void
+  label?: string
 }) {
   const [models, setModels] = useState<ORModel[]>([])
   const [loading, setLoading] = useState(false)
@@ -74,7 +76,7 @@ function ModelPicker({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-400">Modelo padrão</label>
+      <label className="text-xs font-medium text-gray-400">{label}</label>
       <div className="flex gap-2">
         <div ref={ref} className="relative flex-1">
           <input

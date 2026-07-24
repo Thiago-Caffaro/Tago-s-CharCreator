@@ -13,10 +13,15 @@ def get_client() -> OpenAI:
     return _client
 
 
-def stream_message(system: str, user: str, max_tokens: int | None = None):
+def stream_message(
+    system: str, user: str, max_tokens: int | None = None,
+    model: str | None = None, temperature: float | None = None, top_p: float | None = None,
+):
     """Stream a chat completion, filtering out any <think>…</think> blocks.
 
-    max_tokens — per-call override. Falls back to settings.max_tokens.
+    max_tokens, model, temperature, top_p — per-call overrides (e.g. a
+    project's own generation settings). Each falls back to the matching
+    global setting when not given.
 
     Some reasoning-capable models (GLM-Z1, DeepSeek-R1, QwQ, etc.) emit
     their internal chain-of-thought as <think>…</think> blocks in the
@@ -49,10 +54,10 @@ def stream_message(system: str, user: str, max_tokens: int | None = None):
         kwargs["extra_body"] = extra_body
 
     stream = client.chat.completions.create(
-        model=settings.default_model,
+        model=model or settings.default_model,
         max_tokens=max_tokens or settings.max_tokens,
-        temperature=settings.temperature,
-        top_p=settings.top_p,
+        temperature=temperature if temperature is not None else settings.temperature,
+        top_p=top_p if top_p is not None else settings.top_p,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},

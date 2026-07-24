@@ -16,6 +16,10 @@ class ProjectBase(SQLModel):
     # last_generated_card rather than as a separate file, consistent with the
     # rest of this app's no-file-storage design.
     avatar: Optional[str] = None
+    # Per-project generation overrides — None means "use the global setting".
+    gen_model: Optional[str] = None
+    gen_temperature: Optional[float] = None
+    gen_top_p: Optional[float] = None
 
 
 class Project(ProjectBase, table=True):
@@ -39,6 +43,9 @@ class ProjectUpdate(SQLModel):
     character_name: Optional[str] = None
     last_generated_card: Optional[str] = None
     avatar: Optional[str] = None
+    gen_model: Optional[str] = None
+    gen_temperature: Optional[float] = None
+    gen_top_p: Optional[float] = None
 
 
 class ProjectRead(ProjectBase):

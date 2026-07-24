@@ -84,6 +84,9 @@ def duplicate_project(project_id: int, session: Session = Depends(get_session)):
         character_name=project.character_name,
         last_generated_card=project.last_generated_card,
         avatar=project.avatar,
+        gen_model=project.gen_model,
+        gen_temperature=project.gen_temperature,
+        gen_top_p=project.gen_top_p,
     )
     session.add(new_project)
     session.flush()  # get new_project.id without committing
@@ -162,6 +165,9 @@ def export_project(project_id: int, session: Session = Depends(get_session)):
             "character_name": project.character_name,
             "last_generated_card": project.last_generated_card,
             "avatar": project.avatar,
+            "gen_model": project.gen_model,
+            "gen_temperature": project.gen_temperature,
+            "gen_top_p": project.gen_top_p,
         },
         "context_cards": [
             {
@@ -204,6 +210,9 @@ def import_project(data: dict, session: Session = Depends(get_session)):
         character_name=p.get("character_name", ""),
         last_generated_card=p.get("last_generated_card"),
         avatar=p.get("avatar"),
+        gen_model=p.get("gen_model"),
+        gen_temperature=p.get("gen_temperature"),
+        gen_top_p=p.get("gen_top_p"),
     )
     session.add(project)
     session.flush()  # get project.id without committing

@@ -20,6 +20,10 @@ export interface Project {
   updated_at: string
   last_generated_card?: string
   avatar?: string
+  // Per-project generation overrides — null/undefined means "use the global setting".
+  gen_model?: string | null
+  gen_temperature?: number | null
+  gen_top_p?: number | null
 }
 
 export interface CardGeneration {

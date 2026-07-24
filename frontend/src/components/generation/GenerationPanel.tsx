@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wand2, Sparkles, RefreshCw } from 'lucide-react'
+import { Wand2, Sparkles, RefreshCw, Settings2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { Select } from '../ui/Select'
@@ -8,9 +8,11 @@ import { Textarea } from '../ui/Textarea'
 import { TokenCounter } from './TokenCounter'
 import { StreamingOutput } from './StreamingOutput'
 import { PresetMultiSelect } from './PresetMultiSelect'
+import { ProjectGenerationSettings } from './ProjectGenerationSettings'
 import { presetsApi } from '../../api/presets'
 import { generationApi } from '../../api/generation'
 import { useGenerationStore } from '../../store/useGenerationStore'
+import { useProjectStore } from '../../store/useProjectStore'
 import { CHARA_FIELDS } from '../../types'
 import type { FieldPreset } from '../../types'
 
@@ -36,9 +38,11 @@ export function GenerationPanel({ projectId, desktop }: Props) {
     setCurrentField, setGeneratedCard, resetFieldProgress,
   } = useGenerationStore()
 
+  const { currentProject } = useProjectStore()
   const [presets, setPresets] = useState<FieldPreset[]>([])
   const [refineInstruction, setRefineInstruction] = useState('')
   const [refineContent, setRefineContent] = useState('')
+  const [showGenSettings, setShowGenSettings] = useState(false)
 
   useEffect(() => {
     presetsApi.list().then(setPresets).catch(() => {})
@@ -80,8 +84,25 @@ export function GenerationPanel({ projectId, desktop }: Props) {
     }
   }
 
+  const hasOverride = !!(currentProject?.gen_model || currentProject?.gen_temperature != null || currentProject?.gen_top_p != null)
+
   const inner = (
     <div className="overflow-auto p-4 space-y-4 h-full">
+      <button
+        onClick={() => setShowGenSettings(true)}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
+          hasOverride
+            ? 'border-[#9b59b6]/40 bg-[#9b59b6]/5 text-[#9b59b6]'
+            : 'border-[#2a2a2a] bg-[#1a1a1a] text-gray-500 hover:text-gray-300 hover:border-[#333]'
+        }`}
+      >
+        <span className="flex items-center gap-1.5">
+          <Settings2 size={12} />
+          Geração deste projeto
+        </span>
+        {hasOverride && <span className="text-[10px]">personalizado</span>}
+      </button>
+
       <Select
         label="Modo"
         value={mode}
@@ -149,6 +170,12 @@ export function GenerationPanel({ projectId, desktop }: Props) {
       </Button>
 
       {mode !== 'full' && <StreamingOutput />}
+
+      <ProjectGenerationSettings
+        projectId={projectId}
+        open={showGenSettings}
+        onClose={() => setShowGenSettings(false)}
+      />
     </div>
   )
 

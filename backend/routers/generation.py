@@ -23,10 +23,13 @@ router = APIRouter(prefix="/api/generate", tags=["generation"])
 STREAM_ERROR_MARKER = "\n__STREAM_ERROR__:"
 
 
-def _stream_with_errors(system: str, user: str, max_tokens: int | None = None):
+def _stream_with_errors(
+    system: str, user: str, max_tokens: int | None = None,
+    model: str | None = None, temperature: float | None = None, top_p: float | None = None,
+):
     """Wrap stream_message so API/network failures surface as a marker instead of killing the connection silently."""
     try:
-        for chunk in stream_message(system, user, max_tokens=max_tokens):
+        for chunk in stream_message(system, user, max_tokens=max_tokens, model=model, temperature=temperature, top_p=top_p):
             yield chunk
     except Exception as e:
         yield f"{STREAM_ERROR_MARKER}{e}"
@@ -351,7 +354,10 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
                 configured = user_limits.get(field)
                 max_tok = configured if configured is not None else prompt_assembler.FIELD_MAX_TOKENS.get(field, 2048)
                 content = ""
-                for chunk in stream_message(system, user, max_tokens=max_tok):
+                for chunk in stream_message(
+                    system, user, max_tokens=max_tok,
+                    model=project.gen_model, temperature=project.gen_temperature, top_p=project.gen_top_p,
+                ):
                     content += chunk
                     yield chunk
 
@@ -425,7 +431,13 @@ def generate_field(req: FieldRequest, session: Session = Depends(get_session)):
     configured = _settings.field_max_tokens.get(req.field_name)
     max_tok = configured if configured is not None else prompt_assembler.FIELD_MAX_TOKENS.get(req.field_name, 2048)
 
-    return StreamingResponse(_stream_with_errors(system, user, max_tokens=max_tok), media_type="text/plain")
+    return StreamingResponse(
+        _stream_with_errors(
+            system, user, max_tokens=max_tok,
+            model=project.gen_model, temperature=project.gen_temperature, top_p=project.gen_top_p,
+        ),
+        media_type="text/plain",
+    )
 
 
 @router.post("/refine")
@@ -435,7 +447,13 @@ def refine_field(req: RefineRequest, session: Session = Depends(get_session)):
         req.field_name, req.current_content, req.instruction, global_rules
     )
 
-    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
+    return StreamingResponse(
+        _stream_with_errors(
+            system, user,
+            model=project.gen_model, temperature=project.gen_temperature, top_p=project.gen_top_p,
+        ),
+        media_type="text/plain",
+    )
 
 
 @router.post("/lorebook")
@@ -443,7 +461,13 @@ def generate_lorebook(req: LorebookGenRequest, session: Session = Depends(get_se
     project, cards, global_rules = _load_context(req.project_id, session)
     system, user = prompt_assembler.build_lorebook_prompt(project, cards, req.description, global_rules)
 
-    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
+    return StreamingResponse(
+        _stream_with_errors(
+            system, user,
+            model=project.gen_model, temperature=project.gen_temperature, top_p=project.gen_top_p,
+        ),
+        media_type="text/plain",
+    )
 
 
 @router.post("/fix-check")
