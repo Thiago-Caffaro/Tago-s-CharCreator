@@ -312,7 +312,14 @@ export default function Dashboard() {
               className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4 hover:border-[#9b59b6]/40 transition-colors cursor-pointer group"
               onClick={() => navigate(`/editor/${project.id}`)}
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-11 h-11 rounded-xl bg-[#9b59b6]/15 border border-[#9b59b6]/20
+                  flex items-center justify-center shrink-0 overflow-hidden">
+                  {project.avatar
+                    ? <img src={project.avatar} alt="" className="w-full h-full object-cover" />
+                    : <Folder size={18} className="text-[#9b59b6]" />
+                  }
+                </div>
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-semibold text-gray-100 truncate">{project.name}</h2>
                   {project.character_name && (
@@ -381,10 +388,13 @@ export default function Dashboard() {
               onClick={() => navigate(`/editor/${project.id}`)}
             >
               <div className="flex items-start gap-3">
-                {/* Icon */}
+                {/* Icon / avatar */}
                 <div className="w-10 h-10 rounded-xl bg-[#9b59b6]/15 border border-[#9b59b6]/20
-                  flex items-center justify-center shrink-0 mt-0.5">
-                  <Folder size={18} className="text-[#9b59b6]" />
+                  flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+                  {project.avatar
+                    ? <img src={project.avatar} alt="" className="w-full h-full object-cover" />
+                    : <Folder size={18} className="text-[#9b59b6]" />
+                  }
                 </div>
 
                 {/* Info */}
