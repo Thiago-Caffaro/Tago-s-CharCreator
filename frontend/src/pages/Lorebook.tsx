@@ -134,7 +134,12 @@ export default function Lorebook() {
             content: e.content || '', enabled: e.enabled ?? true,
             insertion_order: e.insertion_order ?? 10, position: e.position ?? 1,
             constant: e.constant ?? false, selective: e.selective ?? false,
-            probability: e.probability ?? 100, depth: e.depth ?? 4, comment: e.comment || '',
+            probability: e.probability ?? 100, depth: e.depth ?? 4,
+            // The AI reliably fills "name" but often skips "comment" even
+            // though the prompt asks for both — SillyTavern displays
+            // "comment" as the entry's title, so a blank one makes the
+            // entry look field-less when edited there. Fall back to name.
+            comment: e.comment || e.name || '',
           })
           setEntries(prev => [...prev, created])
         }

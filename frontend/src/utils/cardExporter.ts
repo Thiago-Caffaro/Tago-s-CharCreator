@@ -28,7 +28,11 @@ function buildCharacterBook(entries: LorebookEntry[], characterName: string): Lo
       constant: e.constant,
       selective: e.selective,
       probability: e.probability,
-      comment: e.comment,
+      // SillyTavern uses "comment" as the entry's displayed title/memo — this
+      // app's own UI treats "name" as the primary field and leaves "comment"
+      // (a separate, secondary field) empty far more often, so fall back to
+      // name to avoid entries showing up titleless in ST.
+      comment: e.comment || e.name,
       extensions: {
         depth: e.depth,
         weight: 100,

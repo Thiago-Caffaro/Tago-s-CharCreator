@@ -70,7 +70,11 @@ def export_lorebook(project_id: int, session: Session = Depends(get_session)):
             "name": entry.name,
             "key": json.loads(entry.keys),
             "keysecondary": json.loads(entry.secondary_keys),
-            "comment": entry.comment,
+            # SillyTavern uses "comment" as the entry's displayed title/memo —
+            # this app's own UI treats "name" as the primary field and leaves
+            # "comment" (a separate, secondary field) empty far more often, so
+            # fall back to name to avoid entries showing up titleless in ST.
+            "comment": entry.comment or entry.name,
             "content": entry.content,
             "constant": entry.constant,
             "selective": entry.selective,
