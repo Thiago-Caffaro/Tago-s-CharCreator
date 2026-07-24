@@ -1,9 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Folder, Trash2, Edit2, Copy, User, Calendar, Upload, Download, ChevronRight } from 'lucide-react'
+import { Plus, Folder, Trash2, Edit2, Copy, User, Calendar, Upload, FileImage, Download, ChevronRight } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useProjectStore } from '../store/useProjectStore'
 import { projectsApi } from '../api/projects'
+import { contextCardsApi } from '../api/contextCards'
+import { lorebookApi } from '../api/lorebook'
+import { parseCardFile } from '../utils/cardImporter'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { Input } from '../components/ui/Input'
@@ -11,6 +14,20 @@ import { Textarea } from '../components/ui/Textarea'
 import { SearchInput } from '../components/ui/SearchInput'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import type { Project } from '../types'
+
+// Card fields brought in as context cards (with target_field set) so the
+// imported character immediately has source material for regeneration,
+// instead of only existing as an opaque last_generated_card blob.
+const IMPORT_FIELD_CARDS: { field: string; title: string }[] = [
+  { field: 'description', title: 'Descrição' },
+  { field: 'personality', title: 'Personalidade' },
+  { field: 'scenario', title: 'Cenário' },
+  { field: 'first_mes', title: 'Primeira Mensagem' },
+  { field: 'mes_example', title: 'Exemplos de Mensagem' },
+  { field: 'system_prompt', title: 'System Prompt' },
+  { field: 'post_history_instructions', title: 'Post-History Instructions' },
+  { field: 'creator_notes', title: 'Notas do Criador' },
+]
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -21,8 +38,10 @@ export default function Dashboard() {
   const [form, setForm] = useState({ name: '', character_name: '', description: '' })
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importingCard, setImportingCard] = useState(false)
   const [search, setSearch] = useState('')
   const importRef = useRef<HTMLInputElement>(null)
+  const cardImportRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { fetchProjects() }, [])
 
@@ -107,6 +126,69 @@ export default function Dashboard() {
     }
   }
 
+  const handleImportCardFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImportingCard(true)
+    try {
+      const { card, avatarDataUrl } = await parseCardFile(file)
+      const data = card.data
+
+      const project = await createProject({
+        name: data.name || file.name.replace(/\.(png|json)$/i, ''),
+        character_name: data.name || '',
+      })
+
+      await projectsApi.update(project.id, {
+        ...(avatarDataUrl ? { avatar: avatarDataUrl } : {}),
+        last_generated_card: JSON.stringify(card),
+      })
+
+      let order = 0
+      for (const { field, title } of IMPORT_FIELD_CARDS) {
+        const content = (data as any)[field]
+        if (typeof content === 'string' && content.trim()) {
+          await contextCardsApi.create(project.id, {
+            title: `${title} (importado)`,
+            card_type: 'custom',
+            content,
+            target_field: field,
+            order_index: order++,
+          })
+        }
+      }
+
+      const book = data.character_book
+      if (book?.entries?.length) {
+        for (const entry of book.entries) {
+          await lorebookApi.create(project.id, {
+            name: entry.comment || '',
+            keys: JSON.stringify(entry.keys || []),
+            secondary_keys: JSON.stringify(entry.secondary_keys || []),
+            content: entry.content || '',
+            enabled: entry.enabled ?? true,
+            insertion_order: entry.insertion_order ?? 10,
+            position: entry.position ?? 1,
+            constant: entry.constant ?? false,
+            selective: entry.selective ?? false,
+            probability: entry.probability ?? 100,
+            depth: entry.extensions?.depth ?? 4,
+            comment: entry.comment || '',
+          })
+        }
+      }
+
+      await fetchProjects()
+      toast.success(`Card "${data.name || 'sem nome'}" importado!`)
+      navigate(`/editor/${project.id}`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Erro ao importar card')
+    } finally {
+      setImportingCard(false)
+    }
+  }
+
   return (
     <div className="p-4 max-w-2xl mx-auto lg:p-6 lg:max-w-6xl">
 
@@ -128,7 +210,26 @@ export default function Dashboard() {
             className="hidden"
             onChange={handleImportFile}
           />
-          {/* Mobile: icon-only import button */}
+          <input
+            ref={cardImportRef}
+            type="file"
+            accept="image/png,.png,application/json,.json"
+            className="hidden"
+            onChange={handleImportCardFile}
+          />
+          {/* Mobile: icon-only import buttons */}
+          <button
+            onClick={() => cardImportRef.current?.click()}
+            disabled={importingCard}
+            className="lg:hidden flex items-center justify-center w-10 h-10 rounded-xl border border-[#333]
+              bg-[#1e1e1e] text-gray-400 active:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+            title="Importar Card (PNG/JSON de outro app)"
+          >
+            {importingCard
+              ? <span className="w-4 h-4 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+              : <FileImage size={16} />
+            }
+          </button>
           <button
             onClick={() => importRef.current?.click()}
             disabled={importing}
@@ -141,7 +242,17 @@ export default function Dashboard() {
               : <Upload size={16} />
             }
           </button>
-          {/* Desktop: labeled import button */}
+          {/* Desktop: labeled import buttons */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => cardImportRef.current?.click()}
+            loading={importingCard}
+            className="hidden lg:inline-flex"
+            title="Importa um character card (.png ou .json) do SillyTavern, Chub, etc."
+          >
+            <FileImage size={14} /> Importar Card
+          </Button>
           <Button
             variant="secondary"
             size="sm"
