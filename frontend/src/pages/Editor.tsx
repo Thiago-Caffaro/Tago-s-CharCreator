@@ -66,7 +66,7 @@ export default function Editor() {
           ))}
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {tab === 'cards' && (
             <ContextCardBoard projectId={id} onSelectCard={setSelectedCard} />
           )}
