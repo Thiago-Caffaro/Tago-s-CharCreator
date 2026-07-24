@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Plus, Layers, Tag, Download, Upload, LayoutTemplate, Trash2 } from 'lucide-react'
+import { Plus, Layers, Tag, Download, Upload, LayoutTemplate, Trash2, Mic } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { presetsApi } from '../api/presets'
 import { cardTypesApi } from '../api/cardTypes'
@@ -51,6 +51,7 @@ function PresetsTab() {
     target_field: CHARA_FIELDS[0],
     system_prompt_override: '',
     is_default: false,
+    is_voice: false,
   })
   const [saving, setSaving] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -116,10 +117,13 @@ function PresetsTab() {
     if (!form.name.trim()) return
     setSaving(true)
     try {
-      const p = await presetsApi.create(form)
+      const p = await presetsApi.create({
+        ...form,
+        target_field: form.is_voice ? '' : form.target_field,
+      })
       setPresets(prev => [...prev, p])
       setShowCreate(false)
-      setForm({ name: '', target_field: CHARA_FIELDS[0], system_prompt_override: '', is_default: false })
+      setForm({ name: '', target_field: CHARA_FIELDS[0], system_prompt_override: '', is_default: false, is_voice: false })
       toast.success('Preset criado!')
       setSelected(p)
     } catch {
@@ -157,6 +161,7 @@ function PresetsTab() {
         target_field: preset.target_field,
         system_prompt_override: preset.system_prompt_override,
         is_default: false,
+        is_voice: preset.is_voice,
       })
       setPresets(prev => [...prev, p])
       toast.success('Preset duplicado!')
@@ -235,13 +240,26 @@ function PresetsTab() {
             </div>
           ) : (
             <div className="space-y-6">
-              {Object.entries(groups).map(([field, group]) => (
-                <div key={field}>
+              {Object.entries(groups)
+                .sort(([a], [b]) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b)))
+                .map(([field, group]) => (
+                <div key={field || '__voice__'}>
                   <div className="flex items-center gap-2 mb-3">
-                    <Tag size={12} className="text-gray-600" />
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-mono">
-                      {field}
-                    </span>
+                    {field === '' ? (
+                      <>
+                        <Mic size={12} className="text-[#9b59b6]" />
+                        <span className="text-xs font-semibold text-[#9b59b6] uppercase tracking-wider font-mono">
+                          Voz do Personagem
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Tag size={12} className="text-gray-600" />
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-mono">
+                          {field}
+                        </span>
+                      </>
+                    )}
                     <span className="text-[10px] text-gray-700">({group.length})</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -277,23 +295,45 @@ function PresetsTab() {
             label="Nome"
             value={form.name}
             onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="ex: Descrição Detalhada NSFW"
+            placeholder={form.is_voice ? 'ex: Voz Poética e Melancólica' : 'ex: Descrição Detalhada NSFW'}
           />
-          <Select
-            label="Campo-alvo"
-            value={form.target_field}
-            onChange={e => setForm(f => ({ ...f, target_field: e.target.value }))}
-            options={PRESET_FIELD_OPTIONS}
-          />
+          <div className="flex items-start gap-3 px-3 py-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
+            <Toggle
+              checked={form.is_voice}
+              onChange={v => setForm(f => ({ ...f, is_voice: v }))}
+            />
+            <div className="flex items-center gap-1.5 -mt-0.5">
+              <Mic size={12} className="text-[#9b59b6]" />
+              <div>
+                <p className="text-xs text-gray-300 font-medium">Voz do Personagem</p>
+                <p className="text-[10px] text-gray-600">
+                  Aplica a TODOS os campos durante a geração de card completo, em vez de um campo só —
+                  use para manter um tom/estilo consistente.
+                </p>
+              </div>
+            </div>
+          </div>
+          {!form.is_voice && (
+            <Select
+              label="Campo-alvo"
+              value={form.target_field}
+              onChange={e => setForm(f => ({ ...f, target_field: e.target.value }))}
+              options={PRESET_FIELD_OPTIONS}
+            />
+          )}
           <Textarea
             label="System Prompt Override (opcional)"
             value={form.system_prompt_override}
             onChange={e => setForm(f => ({ ...f, system_prompt_override: e.target.value }))}
             rows={4}
-            placeholder="Deixe vazio para editar depois..."
+            placeholder={
+              form.is_voice
+                ? 'ex: Escreva em um estilo lento e poético. Frases curtas durante tensão, mais longas e fluidas em momentos calmos.'
+                : 'Deixe vazio para editar depois...'
+            }
           />
           <Toggle
-            label="Definir como padrão para este campo"
+            label={form.is_voice ? 'Definir como voz padrão' : 'Definir como padrão para este campo'}
             checked={form.is_default}
             onChange={v => setForm(f => ({ ...f, is_default: v }))}
           />

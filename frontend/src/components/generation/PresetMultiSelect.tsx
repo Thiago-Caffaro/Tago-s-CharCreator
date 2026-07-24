@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Star, X } from 'lucide-react'
+import { ChevronDown, Star, X, Mic } from 'lucide-react'
 import type { FieldPreset } from '../../types'
 
 interface Props {
@@ -17,6 +17,7 @@ const FIELD_ORDER = [
 function groupPresets(presets: FieldPreset[]) {
   const groups: Record<string, FieldPreset[]> = {}
   for (const p of presets) {
+    if (p.is_voice) continue
     if (!groups[p.target_field]) groups[p.target_field] = []
     groups[p.target_field].push(p)
   }
@@ -64,6 +65,7 @@ export function PresetMultiSelect({ presets, selectedIds, onChange }: Props) {
 
   const clearAll = () => onChange([])
 
+  const voicePresets = presets.filter(p => p.is_voice)
   const groups = groupPresets(presets)
   const label = selectedIds.length === 0
     ? 'Nenhum preset'
@@ -134,6 +136,35 @@ export function PresetMultiSelect({ presets, selectedIds, onChange }: Props) {
               Limpar
             </button>
           </div>
+
+          {/* Voice presets — apply to every field, shown separately from per-field groups */}
+          {voicePresets.length > 0 && (
+            <div>
+              <div className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-semibold text-[#9b59b6] uppercase tracking-wider
+                bg-[#1a1a1a] border-b border-[#2a2a2a]">
+                <Mic size={10} />
+                Voz do Personagem
+              </div>
+              {voicePresets.map(p => (
+                <label
+                  key={p.id}
+                  className="flex items-center gap-2.5 px-3 py-2 cursor-pointer
+                    hover:bg-[#242424] transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(p.id)}
+                    onChange={() => toggle(p.id)}
+                    className="accent-[#9b59b6] w-3 h-3 shrink-0"
+                  />
+                  <span className="text-xs text-gray-300 flex-1">{p.name}</span>
+                  {p.is_default && (
+                    <span title="Padrão"><Star size={9} className="text-[#9b59b6] shrink-0" /></span>
+                  )}
+                </label>
+              ))}
+            </div>
+          )}
 
           {/* Grouped presets */}
           {groups.map(({ field, items }) => (

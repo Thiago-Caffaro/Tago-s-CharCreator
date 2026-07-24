@@ -70,6 +70,9 @@ export interface FieldPreset {
   target_field: string
   system_prompt_override: string
   is_default: boolean
+  // A voice preset (target_field === '') applies its system_prompt_override
+  // to every field during full-card generation instead of just one field.
+  is_voice: boolean
   created_at: string
 }
 

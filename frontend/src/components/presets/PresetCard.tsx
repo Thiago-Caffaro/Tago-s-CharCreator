@@ -1,5 +1,5 @@
 import React from 'react'
-import { Trash2, Star, Tag, Copy } from 'lucide-react'
+import { Trash2, Star, Tag, Copy, Mic } from 'lucide-react'
 import type { FieldPreset } from '../../types'
 import { CHARA_FIELDS } from '../../types'
 
@@ -30,7 +30,7 @@ interface Props {
 }
 
 export function PresetCard({ preset, onSelect, onDelete, onDuplicate, onToggleDefault }: Props) {
-  const color = fieldColor(preset.target_field)
+  const color = preset.is_voice ? '#9b59b6' : fieldColor(preset.target_field)
 
   return (
     <div
@@ -47,8 +47,8 @@ export function PresetCard({ preset, onSelect, onDelete, onDuplicate, onToggleDe
             className="inline-flex items-center gap-1 text-[10px] font-mono mt-1 px-1.5 py-0.5 rounded-md"
             style={{ background: color + '22', color }}
           >
-            <Tag size={9} />
-            {preset.target_field}
+            {preset.is_voice ? <Mic size={9} /> : <Tag size={9} />}
+            {preset.is_voice ? 'voz' : preset.target_field}
           </span>
         </div>
         <div

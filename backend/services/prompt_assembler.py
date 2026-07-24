@@ -317,11 +317,14 @@ def build_full_card_prompt(
     if presets:
         sections = []
         for p in presets:
-            field_label = p.target_field.upper().replace('_', ' ')
-            sections.append(
-                f"\n\n━━━ FIELD-SPECIFIC GUIDANCE [{field_label}] — {p.name} ━━━\n"
-                f"{p.system_prompt_override}"
-            )
+            if p.is_voice:
+                sections.append(f"\n\nCHARACTER VOICE — {p.name}:\n{p.system_prompt_override}")
+            else:
+                field_label = p.target_field.upper().replace('_', ' ')
+                sections.append(
+                    f"\n\n━━━ FIELD-SPECIFIC GUIDANCE [{field_label}] — {p.name} ━━━\n"
+                    f"{p.system_prompt_override}"
+                )
         system += "".join(sections)
     if global_rules:
         rules_text = "\n".join(f"- {r.content}" for r in global_rules if r.is_active)
@@ -345,6 +348,7 @@ def build_field_prompt(
     global_rules: list[GenerationRule],
     field_rules: list[GenerationRule],
     preset: Optional[FieldPreset] = None,
+    voice_presets: Optional[list[FieldPreset]] = None,
 ) -> tuple[str, str]:
     # Priority:
     #   1. User-selected preset (most specific, user-authored)
@@ -355,6 +359,12 @@ def build_field_prompt(
         system = preset.system_prompt_override
     else:
         system = FIELD_SYSTEM.get(field_name, DEFAULT_SYSTEM)
+
+    # Voice presets apply on top of whatever the field's own prompt is —
+    # they set tone/style, not field structure, so every field gets them
+    # appended rather than one field's prompt being replaced.
+    for voice in (voice_presets or []):
+        system += f"\n\nCHARACTER VOICE — {voice.name}:\n{voice.system_prompt_override}"
 
     # Enforce English output universally — multilingual models (GLM, Qwen, DeepSeek)
     # occasionally bleed Russian, Chinese, or other languages into prose output.
@@ -387,8 +397,11 @@ def build_refine_prompt(
     current_content: str,
     instruction: str,
     global_rules: list[GenerationRule],
+    voice_presets: Optional[list[FieldPreset]] = None,
 ) -> tuple[str, str]:
     system = DEFAULT_SYSTEM
+    for voice in (voice_presets or []):
+        system += f"\n\nCHARACTER VOICE — {voice.name}:\n{voice.system_prompt_override}"
     if global_rules:
         rules_text = "\n".join(f"- {r.content}" for r in global_rules if r.is_active)
         system += f"\n\nREGRAS ADICIONAIS:\n{rules_text}"
@@ -407,6 +420,7 @@ def build_lorebook_prompt(
     cards: list[ContextCard],
     description: str,
     global_rules: list[GenerationRule],
+    voice_presets: Optional[list[FieldPreset]] = None,
 ) -> tuple[str, str]:
     system = (
         "You are an expert SillyTavern lorebook author. Generate comprehensive, well-structured lorebook entries.\n\n"
@@ -446,6 +460,8 @@ def build_lorebook_prompt(
         "  Secondary lorebook (optional): specific acts, positions, aftercare, environmental entries.\n"
         "  Species-specific entries for non-human characters: knot/heat/purring/barbs behavior as separate entries."
     )
+    for voice in (voice_presets or []):
+        system += f"\n\nCHARACTER VOICE — {voice.name}:\n{voice.system_prompt_override}"
     user_parts = [f"Nome do personagem: {project.character_name or project.name}"]
     for card in sorted(cards, key=lambda c: c.order_index):
         if card.is_active:

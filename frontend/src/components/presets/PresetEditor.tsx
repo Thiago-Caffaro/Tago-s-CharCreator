@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { X, Mic } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 import type { FieldPreset } from '../../types'
 import { CHARA_FIELDS } from '../../types'
@@ -21,6 +21,7 @@ export function PresetEditor({ preset, onClose, onSave }: Props) {
   const [targetField, setTargetField] = useState('')
   const [prompt, setPrompt] = useState('')
   const [isDefault, setIsDefault] = useState(false)
+  const [isVoice, setIsVoice] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function PresetEditor({ preset, onClose, onSave }: Props) {
       setTargetField(preset.target_field)
       setPrompt(preset.system_prompt_override)
       setIsDefault(preset.is_default)
+      setIsVoice(preset.is_voice)
     }
   }, [preset])
 
@@ -39,9 +41,10 @@ export function PresetEditor({ preset, onClose, onSave }: Props) {
     try {
       await onSave(preset.id, {
         name,
-        target_field: targetField,
+        target_field: isVoice ? '' : targetField,
         system_prompt_override: prompt,
         is_default: isDefault,
+        is_voice: isVoice,
       })
     } finally {
       setSaving(false)
@@ -64,14 +67,32 @@ export function PresetEditor({ preset, onClose, onSave }: Props) {
           onChange={e => setName(e.target.value)}
           placeholder="ex: Descrição Detalhada NSFW"
         />
-        <Select
-          label="Campo-alvo"
-          value={targetField}
-          onChange={e => setTargetField(e.target.value)}
-          options={FIELD_OPTIONS}
-        />
+        <div className="flex items-start gap-3 px-3 py-2.5 bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg">
+          <Toggle
+            checked={isVoice}
+            onChange={v => {
+              setIsVoice(v)
+              if (!v && !targetField) setTargetField(CHARA_FIELDS[0])
+            }}
+          />
+          <div className="flex items-center gap-1.5 -mt-0.5">
+            <Mic size={12} className="text-[#9b59b6]" />
+            <div>
+              <p className="text-xs text-gray-300 font-medium">Voz do Personagem</p>
+              <p className="text-[10px] text-gray-600">Aplica a TODOS os campos, em vez de um campo só.</p>
+            </div>
+          </div>
+        </div>
+        {!isVoice && (
+          <Select
+            label="Campo-alvo"
+            value={targetField}
+            onChange={e => setTargetField(e.target.value)}
+            options={FIELD_OPTIONS}
+          />
+        )}
         <Toggle
-          label="Preset padrão para este campo"
+          label={isVoice ? 'Definir como voz padrão' : 'Preset padrão para este campo'}
           checked={isDefault}
           onChange={setIsDefault}
         />
@@ -97,7 +118,9 @@ export function PresetEditor({ preset, onClose, onSave }: Props) {
             />
           </div>
           <p className="text-[10px] text-gray-600">
-            Este prompt substitui completamente o system prompt padrão do assembler para o campo selecionado.
+            {isVoice
+              ? 'Este texto é ADICIONADO ao prompt de cada campo durante a geração de card completo — descreva tom/estilo, não a estrutura do campo.'
+              : 'Este prompt substitui completamente o system prompt padrão do assembler para o campo selecionado.'}
           </p>
         </div>
       </div>

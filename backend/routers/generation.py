@@ -282,6 +282,15 @@ def _load_context(project_id: int, session: Session):
     return project, list(cards), list(global_rules)
 
 
+def _get_default_voices(session: Session) -> list[FieldPreset]:
+    """Voice presets marked as default, auto-applied where there's no explicit
+    per-call preset picker (single-field generation, refine, lorebook) — full-card
+    generation instead uses whatever voices the user explicitly selected."""
+    return list(session.exec(
+        select(FieldPreset).where(FieldPreset.is_voice == True, FieldPreset.is_default == True)
+    ).all())
+
+
 # Fields generated one by one in chunked mode, in this order.
 # Each is its own API call so the model has the full output window available.
 _CHUNKED_FIELDS = [
@@ -312,7 +321,9 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
     import json as _json
 
     project, cards, global_rules = _load_context(req.project_id, session)
-    presets = [p for pid in req.preset_ids if (p := session.get(FieldPreset, pid)) is not None]
+    selected_presets = [p for pid in req.preset_ids if (p := session.get(FieldPreset, pid)) is not None]
+    field_presets = [p for p in selected_presets if not p.is_voice]
+    voice_presets = [p for p in selected_presets if p.is_voice]
 
     # Preload all per-field rules in one query
     all_field_rules = session.exec(
@@ -342,10 +353,10 @@ def generate_full_card(req: FullCardRequest, session: Session = Depends(get_sess
 
                 # Prefer a user-selected preset for this field; fall back to the
                 # compact FIELD_SYSTEM prompt which is ~5x smaller than DEFAULT_SYSTEM
-                preset = next((p for p in presets if p.target_field == field), None)
+                preset = next((p for p in field_presets if p.target_field == field), None)
                 field_rules = field_rules_map.get(field, [])
                 system, user = prompt_assembler.build_field_prompt(
-                    project, cards, field, global_rules, field_rules, preset
+                    project, cards, field, global_rules, field_rules, preset, voice_presets
                 )
 
                 # User-configured limit takes priority; fall back to code defaults
@@ -424,7 +435,7 @@ def generate_field(req: FieldRequest, session: Session = Depends(get_session)):
         # the wrong field's prompt override.
         preset = None
     system, user = prompt_assembler.build_field_prompt(
-        project, cards, req.field_name, global_rules, list(field_rules), preset
+        project, cards, req.field_name, global_rules, list(field_rules), preset, _get_default_voices(session)
     )
 
     from ..config import settings as _settings
@@ -444,7 +455,7 @@ def generate_field(req: FieldRequest, session: Session = Depends(get_session)):
 def refine_field(req: RefineRequest, session: Session = Depends(get_session)):
     project, cards, global_rules = _load_context(req.project_id, session)
     system, user = prompt_assembler.build_refine_prompt(
-        req.field_name, req.current_content, req.instruction, global_rules
+        req.field_name, req.current_content, req.instruction, global_rules, _get_default_voices(session)
     )
 
     return StreamingResponse(
@@ -459,7 +470,9 @@ def refine_field(req: RefineRequest, session: Session = Depends(get_session)):
 @router.post("/lorebook")
 def generate_lorebook(req: LorebookGenRequest, session: Session = Depends(get_session)):
     project, cards, global_rules = _load_context(req.project_id, session)
-    system, user = prompt_assembler.build_lorebook_prompt(project, cards, req.description, global_rules)
+    system, user = prompt_assembler.build_lorebook_prompt(
+        project, cards, req.description, global_rules, _get_default_voices(session)
+    )
 
     return StreamingResponse(
         _stream_with_errors(
