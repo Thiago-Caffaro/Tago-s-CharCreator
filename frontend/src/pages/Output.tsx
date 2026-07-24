@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Download, CheckSquare, Eye, Code, Wand2, Save,
-  ImagePlus, FileJson, Image as ImageIcon, RefreshCw, ChevronDown,
+  ImagePlus, FileJson, Image as ImageIcon, RefreshCw, ChevronDown, History,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Editor from '@monaco-editor/react'
@@ -12,6 +12,7 @@ import { Button } from '../components/ui/Button'
 import { BottomSheet } from '../components/ui/BottomSheet'
 import { CardPreview } from '../components/card-output/CardPreview'
 import { QualityChecklist } from '../components/card-output/QualityChecklist'
+import { GenerationHistory } from '../components/card-output/GenerationHistory'
 import { validate_card_client, patchCardClient } from '../utils/validators'
 import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
@@ -52,6 +53,7 @@ export default function Output() {
   const [exportOpen, setExportOpen] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [lorebookEntries, setLorebookEntries] = useState<LorebookEntry[]>([])
+  const [showHistory, setShowHistory] = useState(false)
 
   useEffect(() => {
     if (!projectId) return
@@ -218,6 +220,26 @@ export default function Output() {
     }
   }
 
+  const handleRestore = async (cardJson: string) => {
+    if (!projectId) return
+    setJsonText(cardJson)
+    const { ok, card, errors } = validate_card_client(cardJson)
+    if (ok && card) {
+      setGeneratedCard(card)
+      setJsonErrors([])
+    } else {
+      setJsonErrors(errors)
+      setTab('json')
+    }
+    try {
+      await updateProject(Number(projectId), { last_generated_card: cardJson })
+      toast.success('Versão restaurada!')
+      setShowHistory(false)
+    } catch {
+      toast.error('Erro ao restaurar versão')
+    }
+  }
+
   const handleFixCheck = async (checkId: string) => {
     if (!generatedCard) return
     try {
@@ -330,6 +352,16 @@ export default function Output() {
             }
           </button>
 
+          <button
+            onClick={() => setShowHistory(true)}
+            disabled={!projectId}
+            title="Histórico de gerações"
+            className="flex items-center justify-center w-7 h-7 rounded-lg border border-[#333]
+              bg-[#242424] text-gray-500 hover:text-gray-300 hover:border-[#555] disabled:opacity-40 transition-colors"
+          >
+            <History size={13} />
+          </button>
+
           <Button variant="secondary" size="sm" onClick={handleSave} loading={saving} disabled={saving || !hasContent}>
             <Save size={13} />
             {saving ? 'Salvando…' : 'Salvar'}
@@ -427,6 +459,16 @@ export default function Output() {
               ? <span className="w-3 h-3 border border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
               : <Save size={13} />
             }
+          </button>
+
+          <button
+            onClick={() => setShowHistory(true)}
+            disabled={!projectId}
+            className="flex items-center justify-center w-8 h-8 rounded-lg border border-[#333]
+              bg-[#242424] text-gray-400 disabled:opacity-40 active:bg-[#2a2a2a]"
+            title="Histórico"
+          >
+            <History size={13} />
           </button>
 
           <button
@@ -624,6 +666,16 @@ export default function Output() {
         </div>
         <div className="h-2" />
       </BottomSheet>
+
+      {projectId && (
+        <GenerationHistory
+          open={showHistory}
+          onClose={() => setShowHistory(false)}
+          projectId={Number(projectId)}
+          currentJson={jsonText}
+          onRestore={handleRestore}
+        />
+      )}
     </div>
   )
 }

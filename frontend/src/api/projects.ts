@@ -1,5 +1,5 @@
 import client from './client'
-import type { Project } from '../types'
+import type { Project, CardGeneration } from '../types'
 import { triggerDownload } from '../utils/cardExporter'
 
 export const projectsApi = {
@@ -11,6 +11,8 @@ export const projectsApi = {
     client.put<Project>(`/projects/${id}`, data).then(r => r.data),
   delete: (id: number) => client.delete(`/projects/${id}`),
   duplicate: (id: number) => client.post<Project>(`/projects/${id}/duplicate`).then(r => r.data),
+  getGenerations: (id: number) =>
+    client.get<CardGeneration[]>(`/projects/${id}/generations`).then(r => r.data),
 
   exportProject: async (id: number, name: string) => {
     const data = await client.get(`/projects/${id}/export`).then(r => r.data)

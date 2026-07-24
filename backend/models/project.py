@@ -5,6 +5,7 @@ from datetime import datetime
 if TYPE_CHECKING:
     from .context_card import ContextCard
     from .lorebook import LorebookEntry
+    from .card_generation import CardGeneration
 
 
 class ProjectBase(SQLModel):
@@ -25,6 +26,7 @@ class Project(ProjectBase, table=True):
 
     context_cards: List["ContextCard"] = Relationship(back_populates="project")
     lorebook_entries: List["LorebookEntry"] = Relationship(back_populates="project")
+    generations: List["CardGeneration"] = Relationship(back_populates="project")
 
 
 class ProjectCreate(ProjectBase):

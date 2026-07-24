@@ -7,8 +7,14 @@ from ..database import get_session
 from ..models.project import Project, ProjectCreate, ProjectRead, ProjectUpdate
 from ..models.context_card import ContextCard
 from ..models.lorebook import LorebookEntry
+from ..models.card_generation import CardGeneration, CardGenerationRead
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+# Regenerating overwrites last_generated_card in place — this many prior
+# snapshots are kept per project so a bad regeneration can be compared
+# against or reverted to.
+MAX_GENERATIONS_HISTORY = 20
 
 
 @router.get("", response_model=List[ProjectRead])
@@ -38,10 +44,24 @@ def update_project(project_id: int, data: ProjectUpdate, session: Session = Depe
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(project, key, value)
     project.updated_at = datetime.utcnow()
     session.add(project)
+
+    new_card = update_data.get("last_generated_card")
+    if new_card:
+        session.add(CardGeneration(project_id=project_id, card_json=new_card))
+        session.flush()
+        history = session.exec(
+            select(CardGeneration)
+            .where(CardGeneration.project_id == project_id)
+            .order_by(CardGeneration.created_at.desc())
+        ).all()
+        for old in history[MAX_GENERATIONS_HISTORY:]:
+            session.delete(old)
+
     session.commit()
     session.refresh(project)
     return project
@@ -96,15 +116,30 @@ def delete_project(project_id: int, session: Session = Depends(get_session)):
     project = session.get(Project, project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    # cascade delete context cards and lorebook entries
+    # cascade delete context cards, lorebook entries, and generation history
     cards = session.exec(select(ContextCard).where(ContextCard.project_id == project_id)).all()
     for card in cards:
         session.delete(card)
     entries = session.exec(select(LorebookEntry).where(LorebookEntry.project_id == project_id)).all()
     for entry in entries:
         session.delete(entry)
+    generations = session.exec(select(CardGeneration).where(CardGeneration.project_id == project_id)).all()
+    for generation in generations:
+        session.delete(generation)
     session.delete(project)
     session.commit()
+
+
+@router.get("/{project_id}/generations", response_model=List[CardGenerationRead])
+def list_generations(project_id: int, session: Session = Depends(get_session)):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return session.exec(
+        select(CardGeneration)
+        .where(CardGeneration.project_id == project_id)
+        .order_by(CardGeneration.created_at.desc())
+    ).all()
 
 
 @router.get("/{project_id}/export")

@@ -4,6 +4,7 @@ from .generation_rule import GenerationRule, RuleScope
 from .field_preset import FieldPreset
 from .lorebook import LorebookEntry
 from .card_type_config import CardTypeConfig
+from .card_generation import CardGeneration
 
 __all__ = [
     "Project",
@@ -14,4 +15,5 @@ __all__ = [
     "FieldPreset",
     "LorebookEntry",
     "CardTypeConfig",
+    "CardGeneration",
 ]

@@ -22,6 +22,12 @@ export interface Project {
   avatar?: string
 }
 
+export interface CardGeneration {
+  id: number
+  card_json: string
+  created_at: string
+}
+
 export interface ContextCard {
   id: number
   project_id: number
