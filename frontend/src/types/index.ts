@@ -28,6 +28,13 @@ export interface CardGeneration {
   created_at: string
 }
 
+export interface ProjectTemplate {
+  id: number
+  name: string
+  cards_json: string
+  created_at: string
+}
+
 export interface ContextCard {
   id: number
   project_id: number

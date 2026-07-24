@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Plus, Layers, Tag, Download, Upload } from 'lucide-react'
+import { Plus, Layers, Tag, Download, Upload, LayoutTemplate, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { presetsApi } from '../api/presets'
 import { cardTypesApi } from '../api/cardTypes'
+import { projectTemplatesApi } from '../api/projectTemplates'
 import type { CardTypeConfig } from '../api/cardTypes'
-import type { FieldPreset } from '../types'
+import type { FieldPreset, ProjectTemplate } from '../types'
 import { CHARA_FIELDS } from '../types'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -19,7 +20,7 @@ import { PresetEditor } from '../components/presets/PresetEditor'
 import { CardTypeCard } from '../components/presets/CardTypeCard'
 import { CardTypeEditor } from '../components/presets/CardTypeEditor'
 
-type Tab = 'presets' | 'tipos'
+type Tab = 'presets' | 'tipos' | 'templates'
 
 const FIELD_OPTIONS = [
   { value: '', label: 'Todos os campos' },
@@ -516,6 +517,104 @@ function TiposTab() {
 }
 
 // ──────────────────────────────────────────
+// Templates Tab
+// ──────────────────────────────────────────
+function TemplatesTab() {
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState<ProjectTemplate | null>(null)
+
+  const load = async () => {
+    try {
+      setTemplates(await projectTemplatesApi.list())
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    try {
+      await projectTemplatesApi.delete(confirmDelete.id)
+      setTemplates(prev => prev.filter(t => t.id !== confirmDelete.id))
+      toast.success('Template removido')
+    } catch {
+      toast.error('Erro ao remover template')
+    } finally {
+      setConfirmDelete(null)
+    }
+  }
+
+  return (
+    <div className="flex-1 overflow-auto p-5">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-gray-600">
+          {templates.length} template{templates.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <span className="w-5 h-5 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : templates.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <LayoutTemplate size={40} className="text-gray-700 mb-3" />
+          <p className="text-gray-500 text-sm">Nenhum template ainda</p>
+          <p className="text-gray-700 text-xs mt-1 max-w-xs">
+            Crie um a partir da estrutura de context cards de um projeto, na aba Editor
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {templates.map(t => {
+            const cards = (() => {
+              try { return JSON.parse(t.cards_json || '[]') as { title: string }[] } catch { return [] }
+            })()
+            return (
+              <div
+                key={t.id}
+                className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl p-3 group relative"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-semibold text-gray-100 block truncate">{t.name}</span>
+                    <span className="text-[10px] text-gray-600">
+                      {cards.length} card{cards.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <button
+                    className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20
+                      opacity-0 group-hover:opacity-100 transition-colors shrink-0"
+                    onClick={() => setConfirmDelete(t)}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+                {cards.length > 0 && (
+                  <p className="text-[10px] text-gray-600 mt-2 line-clamp-2">
+                    {cards.map(c => c.title).join(', ')}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={!!confirmDelete}
+        onCancel={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        message={<>Deletar o template <strong className="text-white">{confirmDelete?.name}</strong>?</>}
+      />
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────
 // Main Page
 // ──────────────────────────────────────────
 export default function Presets() {
@@ -524,6 +623,7 @@ export default function Presets() {
   const tabs = [
     { id: 'presets' as Tab, label: 'Presets de Prompt', icon: Layers },
     { id: 'tipos' as Tab, label: 'Tipos de Card', icon: Tag },
+    { id: 'templates' as Tab, label: 'Templates', icon: LayoutTemplate },
   ]
 
   return (
@@ -545,7 +645,9 @@ export default function Presets() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {tab === 'presets' ? <PresetsTab /> : <TiposTab />}
+        {tab === 'presets' && <PresetsTab />}
+        {tab === 'tipos' && <TiposTab />}
+        {tab === 'templates' && <TemplatesTab />}
       </div>
     </div>
   )

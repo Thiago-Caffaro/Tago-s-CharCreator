@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from .config import settings
 from .database import create_db_and_tables, engine
 from .routers import projects, context_cards, rules, presets, lorebook, generation, settings as settings_router
-from .routers import card_types
+from .routers import card_types, project_templates
 from .models import FieldPreset, CardTypeConfig
 from .services.default_data import seed_default_rules
 
@@ -447,6 +447,7 @@ app.include_router(lorebook.router)
 app.include_router(generation.router)
 app.include_router(settings_router.router)
 app.include_router(card_types.router)
+app.include_router(project_templates.router)
 
 
 @app.get("/api/health")

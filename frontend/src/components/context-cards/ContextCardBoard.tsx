@@ -15,14 +15,18 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import toast from 'react-hot-toast'
-import { ListChecks, X } from 'lucide-react'
-import type { ContextCard as ContextCardType } from '../../types'
+import { ListChecks, X, BookmarkPlus } from 'lucide-react'
+import type { ContextCard as ContextCardType, ProjectTemplate } from '../../types'
 import { ContextCard } from './ContextCard'
 import { AddCardMenu } from './AddCardMenu'
+import { TemplateMenu } from './TemplateMenu'
 import { SearchInput } from '../ui/SearchInput'
 import { ConfirmModal } from '../ui/ConfirmModal'
+import { Modal } from '../ui/Modal'
+import { Input } from '../ui/Input'
 import { Button } from '../ui/Button'
 import { useContextCardStore } from '../../store/useContextCardStore'
+import { projectTemplatesApi } from '../../api/projectTemplates'
 
 interface Props {
   projectId: number
@@ -30,13 +34,16 @@ interface Props {
 }
 
 export function ContextCardBoard({ projectId, onSelectCard }: Props) {
-  const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards } = useContextCardStore()
+  const { cards, createCard, updateCard, duplicateCard, deleteCard, reorderCards, fetchCards } = useContextCardStore()
   const [search, setSearch] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<ContextCardType | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
   const [bulkWorking, setBulkWorking] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
 
   const query = search.trim().toLowerCase()
   const filteredCards = query
@@ -144,6 +151,31 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
     }
   }
 
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) return
+    setSavingTemplate(true)
+    try {
+      await projectTemplatesApi.create(templateName.trim(), projectId)
+      toast.success('Template salvo!')
+      setShowSaveTemplate(false)
+      setTemplateName('')
+    } catch {
+      toast.error('Erro ao salvar template')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  const handleApplyTemplate = async (template: ProjectTemplate) => {
+    try {
+      const created = await projectTemplatesApi.apply(template.id, projectId)
+      await fetchCards(projectId)
+      toast.success(`${created.length} card(s) adicionado(s) do template "${template.name}"`)
+    } catch {
+      toast.error('Erro ao aplicar template')
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-5">
       <div className="mb-4">
@@ -166,6 +198,16 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
                 {selectMode ? <X size={15} /> : <ListChecks size={15} />}
               </button>
             )}
+            {!selectMode && cards.length > 0 && (
+              <button
+                onClick={() => setShowSaveTemplate(true)}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-[#242424] transition-colors"
+                title="Salvar estrutura como template"
+              >
+                <BookmarkPlus size={15} />
+              </button>
+            )}
+            {!selectMode && <TemplateMenu onApply={handleApplyTemplate} />}
             {!selectMode && <AddCardMenu onAdd={handleAdd} />}
           </div>
         </div>
@@ -237,6 +279,27 @@ export function ContextCardBoard({ projectId, onSelectCard }: Props) {
         onConfirm={handleBulkDelete}
         message={<>Deletar <strong className="text-white">{selectedCards.length}</strong> card(s) selecionado(s)?</>}
       />
+
+      <Modal open={showSaveTemplate} onClose={() => setShowSaveTemplate(false)} title="Salvar como Template" size="sm">
+        <div className="space-y-4">
+          <p className="text-xs text-gray-500">
+            Salva os títulos, tipos e campos-alvo dos {cards.length} card{cards.length !== 1 ? 's' : ''} atuais
+            (sem o conteúdo) como um template reutilizável.
+          </p>
+          <Input
+            label="Nome do template"
+            value={templateName}
+            onChange={e => setTemplateName(e.target.value)}
+            placeholder="ex: Estrutura NSFW padrão"
+          />
+          <div className="flex gap-2 justify-end pt-1">
+            <Button variant="secondary" onClick={() => setShowSaveTemplate(false)}>Cancelar</Button>
+            <Button loading={savingTemplate} onClick={handleSaveAsTemplate} disabled={!templateName.trim()}>
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
