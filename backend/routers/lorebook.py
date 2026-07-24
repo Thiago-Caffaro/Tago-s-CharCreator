@@ -67,6 +67,7 @@ def export_lorebook(project_id: int, session: Session = Depends(get_session)):
     for i, entry in enumerate(entries, start=1):
         entries_dict[str(i)] = {
             "uid": entry.id,
+            "name": entry.name,
             "key": json.loads(entry.keys),
             "keysecondary": json.loads(entry.secondary_keys),
             "comment": entry.comment,
@@ -103,3 +104,42 @@ def export_lorebook(project_id: int, session: Session = Depends(get_session)):
         content=payload,
         headers={"Content-Disposition": f'attachment; filename="{project.character_name}_lorebook.json"'},
     )
+
+
+@router.post("/api/projects/{project_id}/lorebook/import")
+def import_lorebook(project_id: int, data: dict, session: Session = Depends(get_session)):
+    """Import a SillyTavern World Info / lorebook JSON — the same shape /export produces.
+
+    Real SillyTavern exports have no distinct display name field, only
+    `comment` (which SillyTavern's own UI shows as the entry's title) — our
+    own export additionally stuffs `entry.name` in for a clean round-trip,
+    so prefer that when present and fall back to `comment` otherwise.
+    """
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    entries_data = data.get("entries", {})
+    raw_entries = entries_data.values() if isinstance(entries_data, dict) else entries_data
+
+    created = 0
+    for e in raw_entries:
+        session.add(LorebookEntry(
+            project_id=project_id,
+            name=e.get("name") or e.get("comment") or "",
+            keys=json.dumps(e.get("key", [])),
+            secondary_keys=json.dumps(e.get("keysecondary", [])),
+            content=e.get("content", ""),
+            enabled=not e.get("disable", False),
+            insertion_order=e.get("order", 10),
+            position=e.get("position", 1),
+            constant=e.get("constant", False),
+            selective=e.get("selective", False),
+            probability=e.get("probability", 100),
+            depth=e.get("depth", 4),
+            comment=e.get("comment", ""),
+        ))
+        created += 1
+
+    session.commit()
+    return {"imported": created}

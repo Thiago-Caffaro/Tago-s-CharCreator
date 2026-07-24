@@ -10,4 +10,6 @@ export const lorebookApi = {
     client.put<LorebookEntry>(`/lorebook/${entryId}`, data).then(r => r.data),
   delete: (entryId: number) => client.delete(`/lorebook/${entryId}`),
   exportUrl: (projectId: number) => `/api/projects/${projectId}/lorebook/export`,
+  importLorebook: (projectId: number, data: object) =>
+    client.post<{ imported: number }>(`/projects/${projectId}/lorebook/import`, data).then(r => r.data),
 }

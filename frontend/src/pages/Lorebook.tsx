@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Plus, Download, Trash2, Copy, Wand2, BookOpen, ChevronRight, FlaskConical } from 'lucide-react'
+import { Plus, Download, Upload, Trash2, Copy, Wand2, BookOpen, ChevronRight, FlaskConical } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { lorebookApi } from '../api/lorebook'
 import { generationApi } from '../api/generation'
@@ -24,6 +24,8 @@ export default function Lorebook() {
   const [streamText, setStreamText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<LorebookEntry | null>(null)
   const [showTester, setShowTester] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
     try {
@@ -96,6 +98,28 @@ export default function Lorebook() {
     }
   }
 
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!data.entries) {
+        toast.error('Arquivo inválido — não contém entries de lorebook')
+        return
+      }
+      const result = await lorebookApi.importLorebook(id, data)
+      await load()
+      toast.success(`${result.imported} entrie(s) importada(s)!`)
+    } catch {
+      toast.error('Erro ao importar lorebook')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const handleGenerate = async () => {
     setGenerating(true)
     setStreamText('')
@@ -130,6 +154,14 @@ export default function Lorebook() {
     <div className="flex h-full">
     <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
+      <input
+        ref={importRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={handleImportFile}
+      />
+
       {/* Desktop toolbar */}
       <div className="hidden lg:flex items-center justify-between px-5 py-3 border-b border-[#2a2a2a] shrink-0">
         <span className="text-sm font-semibold text-gray-200">
@@ -141,6 +173,14 @@ export default function Lorebook() {
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowGenModal(true)}>
             <Wand2 size={13} /> Gerar Entries
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => importRef.current?.click()}
+            loading={importing}
+          >
+            <Upload size={13} /> Importar
           </Button>
           <a href={lorebookApi.exportUrl(id)} download>
             <Button variant="secondary" size="sm">
@@ -171,6 +211,18 @@ export default function Lorebook() {
           title="Testar keywords"
         >
           <FlaskConical size={15} />
+        </button>
+        <button
+          onClick={() => importRef.current?.click()}
+          disabled={importing}
+          className="flex items-center justify-center w-9 h-9 rounded-xl border border-[#333]
+            bg-[#1e1e1e] text-gray-400 active:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+          title="Importar lorebook"
+        >
+          {importing
+            ? <span className="w-3.5 h-3.5 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
+            : <Upload size={15} />
+          }
         </button>
         <button
           onClick={() => setShowGenModal(true)}
