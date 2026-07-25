@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Plus, Layers, Tag, Download, Upload, LayoutTemplate, Trash2, Mic } from 'lucide-react'
+import { Plus, Layers, Tag, Download, Upload, LayoutTemplate, Trash2, Mic, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { presetsApi } from '../api/presets'
 import { cardTypesApi } from '../api/cardTypes'
 import { projectTemplatesApi } from '../api/projectTemplates'
 import type { CardTypeConfig } from '../api/cardTypes'
+import type { TemplateCardInput } from '../api/projectTemplates'
+import { useCardTypeStore } from '../store/useCardTypeStore'
 import type { FieldPreset, ProjectTemplate } from '../types'
 import { CHARA_FIELDS } from '../types'
 import { Button } from '../components/ui/Button'
@@ -28,6 +30,11 @@ const FIELD_OPTIONS = [
 ]
 
 const PRESET_FIELD_OPTIONS = CHARA_FIELDS.map(f => ({ value: f, label: f }))
+
+const TEMPLATE_FIELD_OPTIONS = [
+  { value: '', label: 'Livre (sem campo-alvo)' },
+  ...CHARA_FIELDS.map(f => ({ value: f, label: f })),
+]
 
 const PRESET_COLORS = [
   '#3498db', '#2ecc71', '#e67e22', '#e91e63',
@@ -559,10 +566,19 @@ function TiposTab() {
 // ──────────────────────────────────────────
 // Templates Tab
 // ──────────────────────────────────────────
+const EMPTY_CARD_ROW: TemplateCardInput = { title: '', card_type: 'custom', target_field: '' }
+
 function TemplatesTab() {
   const [templates, setTemplates] = useState<ProjectTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState<ProjectTemplate | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [name, setName] = useState('')
+  const [cardRows, setCardRows] = useState<TemplateCardInput[]>([{ ...EMPTY_CARD_ROW }])
+  const [saving, setSaving] = useState(false)
+  const types = useCardTypeStore(s => s.types)
+  const fetchTypes = useCardTypeStore(s => s.fetchTypes)
+  const typeOptions = types.map(t => ({ value: t.slug, label: t.label }))
 
   const load = async () => {
     try {
@@ -572,7 +588,7 @@ function TemplatesTab() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); fetchTypes() }, [])
 
   const handleDelete = async () => {
     if (!confirmDelete) return
@@ -587,12 +603,48 @@ function TemplatesTab() {
     }
   }
 
+  const openCreate = () => {
+    setName('')
+    setCardRows([{ ...EMPTY_CARD_ROW, card_type: types[0]?.slug || 'custom' }])
+    setShowCreate(true)
+  }
+
+  const updateRow = (i: number, patch: Partial<TemplateCardInput>) =>
+    setCardRows(rows => rows.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+
+  const addRow = () =>
+    setCardRows(rows => [...rows, { ...EMPTY_CARD_ROW, card_type: types[0]?.slug || 'custom' }])
+
+  const removeRow = (i: number) =>
+    setCardRows(rows => rows.filter((_, idx) => idx !== i))
+
+  const handleCreate = async () => {
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      const cards = cardRows
+        .filter(r => r.title.trim())
+        .map(r => ({ ...r, target_field: r.target_field || undefined }))
+      const created = await projectTemplatesApi.createManual(name.trim(), cards)
+      setTemplates(prev => [created, ...prev])
+      setShowCreate(false)
+      toast.success('Template criado!')
+    } catch {
+      toast.error('Erro ao criar template')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-5">
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs text-gray-600">
           {templates.length} template{templates.length !== 1 ? 's' : ''}
         </span>
+        <Button size="sm" onClick={openCreate}>
+          <Plus size={13} /> Novo Template
+        </Button>
       </div>
 
       {loading ? (
@@ -604,7 +656,7 @@ function TemplatesTab() {
           <LayoutTemplate size={40} className="text-gray-700 mb-3" />
           <p className="text-gray-500 text-sm">Nenhum template ainda</p>
           <p className="text-gray-700 text-xs mt-1 max-w-xs">
-            Crie um a partir da estrutura de context cards de um projeto, na aba Editor
+            Crie um manualmente acima, ou a partir da estrutura de context cards de um projeto, na aba Editor
           </p>
         </div>
       ) : (
@@ -650,6 +702,61 @@ function TemplatesTab() {
         onConfirm={handleDelete}
         message={<>Deletar o template <strong className="text-white">{confirmDelete?.name}</strong>?</>}
       />
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo Template" size="md">
+        <div className="space-y-4">
+          <Input
+            label="Nome do Template"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="ex: Waifu Padrão"
+          />
+
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-gray-400">Cards</label>
+            {cardRows.map((row, i) => (
+              <div key={i} className="flex items-start gap-2 p-2.5 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
+                <div className="flex-1 space-y-2">
+                  <Input
+                    value={row.title}
+                    onChange={e => updateRow(i, { title: e.target.value })}
+                    placeholder="Título do card..."
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      value={row.card_type}
+                      onChange={e => updateRow(i, { card_type: e.target.value })}
+                      options={typeOptions}
+                    />
+                    <Select
+                      value={row.target_field || ''}
+                      onChange={e => updateRow(i, { target_field: e.target.value })}
+                      options={TEMPLATE_FIELD_OPTIONS}
+                    />
+                  </div>
+                </div>
+                <button
+                  className="p-1.5 mt-0.5 rounded text-gray-600 hover:text-red-400 hover:bg-red-900/20 transition-colors shrink-0"
+                  onClick={() => removeRow(i)}
+                  title="Remover card"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            <Button variant="secondary" size="sm" onClick={addRow}>
+              <Plus size={13} /> Adicionar Card
+            </Button>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancelar</Button>
+            <Button loading={saving} onClick={handleCreate} disabled={!name.trim()}>
+              Criar
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

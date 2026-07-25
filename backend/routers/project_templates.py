@@ -18,20 +18,25 @@ def list_templates(session: Session = Depends(get_session)):
 
 @router.post("", response_model=ProjectTemplateRead, status_code=201)
 def create_template(data: ProjectTemplateCreate, session: Session = Depends(get_session)):
-    """Snapshots a project's context card structure (title/type/target_field, no content) as a reusable template."""
-    project = session.get(Project, data.project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    cards = session.exec(
-        select(ContextCard)
-        .where(ContextCard.project_id == data.project_id)
-        .order_by(ContextCard.order_index)
-    ).all()
-    cards_data = [
-        {"title": c.title, "card_type": c.card_type, "target_field": c.target_field}
-        for c in cards
-    ]
+    """Creates a template either by snapshotting a project's context card
+    structure (title/type/target_field, no content) when project_id is
+    given, or directly from a manually-specified card list otherwise.
+    """
+    if data.project_id is not None:
+        project = session.get(Project, data.project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        cards = session.exec(
+            select(ContextCard)
+            .where(ContextCard.project_id == data.project_id)
+            .order_by(ContextCard.order_index)
+        ).all()
+        cards_data = [
+            {"title": c.title, "card_type": c.card_type, "target_field": c.target_field}
+            for c in cards
+        ]
+    else:
+        cards_data = [c.model_dump() for c in (data.cards or [])]
 
     template = ProjectTemplate(name=data.name, cards_json=json.dumps(cards_data))
     session.add(template)
