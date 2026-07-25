@@ -87,9 +87,11 @@ def import_config(data: dict, session: Session = Depends(get_session)):
 
     Settings are applied in place (same semantics as PUT /api/settings — the
     API key is never touched, whether or not the imported file has one).
-    Rules/presets/templates always create new rows, matching the existing
-    presets import behavior. Card types are skipped when their slug already
-    exists, since the slug column is unique.
+    Rules/presets always create new rows, matching the existing presets
+    import behavior. Card types are skipped when their slug already exists,
+    since the slug column is unique. Templates are matched by name and
+    overwritten in place when one already exists, since re-importing the
+    same backup is a common flow and shouldn't pile up duplicates.
     """
     counts = {"rules": 0, "presets": 0, "card_types": 0, "templates": 0}
 
@@ -149,11 +151,18 @@ def import_config(data: dict, session: Session = Depends(get_session)):
         existing_slugs.add(slug)
         counts["card_types"] += 1
 
+    existing_templates = {t.name: t for t in session.exec(select(ProjectTemplate)).all()}
     for t in data.get("templates", []):
-        session.add(ProjectTemplate(
-            name=t.get("name", "Imported Template"),
-            cards_json=t.get("cards_json", "[]"),
-        ))
+        name = t.get("name", "Imported Template")
+        cards_json = t.get("cards_json", "[]")
+        existing = existing_templates.get(name)
+        if existing:
+            existing.cards_json = cards_json
+            session.add(existing)
+        else:
+            created = ProjectTemplate(name=name, cards_json=cards_json)
+            session.add(created)
+            existing_templates[name] = created
         counts["templates"] += 1
 
     session.commit()
