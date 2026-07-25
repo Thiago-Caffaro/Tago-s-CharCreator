@@ -10,17 +10,36 @@ from ..models.project import Project
 # Used by chunked full-card generation. Each field is its own API call so the
 # model has the full output window available rather than sharing it with every
 # other field in a single monolithic JSON request.
+# Fallback only — the user-configurable settings.field_max_tokens (same keys,
+# see config.py) takes priority whenever a field is present there.
 FIELD_MAX_TOKENS: dict[str, int] = {
-    'description':              6144,
-    'personality':              1024,
-    'scenario':                  512,
-    'first_mes':                2048,
+    'description':              4096,
+    'personality':              2048,
+    'scenario':                  2048,
+    'first_mes':                3072,
     'mes_example':              6144,
     'system_prompt':            2048,
     'post_history_instructions': 512,
-    'alternate_greetings':      4096,
+    'alternate_greetings':      6144,
     'creator_notes':             512,
     'tags':                      256,
+}
+
+# ─── Desired output size, separate from the hard ceiling above ────────────────
+# (min, max) tokens a well-formed field is actually expected to land in. The
+# ceiling above exists so the model isn't cut off mid-sentence — it is not a
+# target, and fields hitting it consistently usually means the content is
+# bloated rather than that the ceiling is too low. Surfaced read-only in
+# GET /api/settings purely as author guidance next to the technical limit.
+FIELD_DESIRED_TOKENS: dict[str, tuple[int, int]] = {
+    'description':               (700, 1800),
+    'personality':                (250, 600),
+    'scenario':                   (200, 500),
+    'first_mes':                  (300, 900),
+    'mes_example':               (1200, 3500),
+    'system_prompt':              (150, 450),
+    'post_history_instructions':   (40, 120),
+    'alternate_greetings':        (600, 2400),
 }
 
 # ─── Compact per-field system prompts ─────────────────────────────────────────

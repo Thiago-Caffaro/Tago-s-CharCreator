@@ -551,7 +551,12 @@ REGRAS ESTRITAS:
         f"Retorne o JSON corrigido e completo, sem nenhum texto fora do JSON."
     )
 
-    return StreamingResponse(_stream_with_errors(system, user), media_type="text/plain")
+    # Unlike fix-check (which only re-emits the broken field), this may have
+    # to re-emit the ENTIRE card — needs far more room than the global
+    # max_tokens default, which is sized for single-field-sized outputs.
+    return StreamingResponse(
+        _stream_with_errors(system, user, max_tokens=16384), media_type="text/plain"
+    )
 
 
 @router.post("/token-estimate")

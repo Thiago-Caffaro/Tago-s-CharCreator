@@ -42,6 +42,8 @@ def export_config(session: Session = Depends(get_session)):
             "temperature": settings.temperature,
             "top_p": settings.top_p,
             "field_max_tokens": settings.field_max_tokens,
+            "include_reasoning": settings.include_reasoning,
+            "reasoning_effort": settings.reasoning_effort,
         },
         "rules": [
             {
@@ -105,6 +107,10 @@ def import_config(data: dict, session: Session = Depends(get_session)):
             settings.top_p = s["top_p"]
         if "field_max_tokens" in s:
             settings.field_max_tokens_json = json.dumps(s["field_max_tokens"])
+        if "include_reasoning" in s:
+            settings.include_reasoning = s["include_reasoning"]
+        if "reasoning_effort" in s:
+            settings.reasoning_effort = s["reasoning_effort"]
         persist_settings()
 
     for r in data.get("rules", []):

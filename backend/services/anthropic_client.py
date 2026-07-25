@@ -35,7 +35,11 @@ def stream_message(
     # ── OpenRouter / model params ────────────────────────────────────────
     extra_body: dict = {}
 
-    if not settings.include_reasoning:
+    if settings.include_reasoning:
+        # OpenRouter unified reasoning param — models that don't support it
+        # simply ignore the field, so this is safe to send unconditionally.
+        extra_body["reasoning"] = {"effort": settings.reasoning_effort}
+    else:
         # OpenRouter standard — hides reasoning from the response payload.
         # Also try effort=none which some providers honour to skip reasoning
         # token generation entirely (saves output budget).

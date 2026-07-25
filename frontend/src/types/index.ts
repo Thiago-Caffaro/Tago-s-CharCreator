@@ -101,6 +101,9 @@ export interface AppSettings {
   temperature: number
   top_p: number
   field_max_tokens: Record<string, number>
+  include_reasoning: boolean
+  reasoning_effort: 'low' | 'medium' | 'high'
+  field_desired_tokens: Record<string, [number, number]>
 }
 
 export const CARD_TYPE_LABELS: Record<CardType, string> = {

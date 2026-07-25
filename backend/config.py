@@ -9,19 +9,29 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     default_model: str = "z-ai/glm-4.7"
     preferred_provider: str = "atlas-cloud"
-    max_tokens: int = 32768
+    # Only used by refine / lorebook / fix-check (fields not covered by
+    # field_max_tokens below) — full-card JSON repair (fix-card) needs far
+    # more room to re-emit an entire card, so it passes its own explicit
+    # max_tokens instead of relying on this global default.
+    max_tokens: int = 6144
     temperature: float = 1.0
     top_p: float = 0.999
     repetition_penalty: float = 1.05   # slight penalty prevents early self-truncation
     include_reasoning: bool = False     # disable reasoning tokens to save output budget
+    reasoning_effort: str = "medium"    # low | medium | high — only applies when include_reasoning is True
 
-    # Per-field output token budgets for chunked full-card generation.
+    # Per-field output token budgets for chunked full-card generation. Each
+    # ceiling sits well above the field's actual desired size (see
+    # prompt_assembler.FIELD_DESIRED_TOKENS) so models have headroom to
+    # finish without being cut off mid-sentence, without going so high that
+    # a verbose model can bloat a field that gets sent on every generation
+    # call (description/personality/scenario are permanent context).
     # Stored as a JSON string so pydantic-settings can load it from the .env file.
     field_max_tokens_json: str = (
-        '{"description":12288,"personality":6144,"scenario":4096,'
-        '"first_mes":9216,"mes_example":24576,'
-        '"system_prompt":9216,"post_history_instructions":4096,'
-        '"alternate_greetings":18432}'
+        '{"description":4096,"personality":2048,"scenario":2048,'
+        '"first_mes":3072,"mes_example":6144,'
+        '"system_prompt":2048,"post_history_instructions":512,'
+        '"alternate_greetings":6144}'
     )
 
     @property
@@ -68,6 +78,8 @@ def persist_settings():
         f"TEMPERATURE={settings.temperature}",
         f"TOP_P={settings.top_p}",
         f"REPETITION_PENALTY={settings.repetition_penalty}",
+        f"INCLUDE_REASONING={settings.include_reasoning}",
+        f"REASONING_EFFORT={settings.reasoning_effort}",
         f"FIELD_MAX_TOKENS_JSON={settings.field_max_tokens_json}",
     ]
     try:

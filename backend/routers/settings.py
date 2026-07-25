@@ -4,6 +4,7 @@ from typing import Optional, List
 import httpx
 
 from ..config import settings, persist_settings
+from ..services.prompt_assembler import FIELD_DESIRED_TOKENS
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -16,6 +17,12 @@ class SettingsRead(BaseModel):
     temperature: float
     top_p: float
     field_max_tokens: dict
+    include_reasoning: bool
+    reasoning_effort: str
+    # Read-only author guidance, not a user-editable setting — see
+    # prompt_assembler.FIELD_DESIRED_TOKENS for why it's separate from the
+    # field_max_tokens ceiling above.
+    field_desired_tokens: dict
 
 
 class SettingsUpdate(BaseModel):
@@ -26,6 +33,8 @@ class SettingsUpdate(BaseModel):
     temperature: Optional[float] = None
     top_p: Optional[float] = None
     field_max_tokens: Optional[dict] = None
+    include_reasoning: Optional[bool] = None
+    reasoning_effort: Optional[str] = None
 
 
 def _mask_key(key: str) -> str:
@@ -44,6 +53,9 @@ def get_settings():
         temperature=settings.temperature,
         top_p=settings.top_p,
         field_max_tokens=settings.field_max_tokens,
+        include_reasoning=settings.include_reasoning,
+        reasoning_effort=settings.reasoning_effort,
+        field_desired_tokens={k: list(v) for k, v in FIELD_DESIRED_TOKENS.items()},
     )
 
 
@@ -64,6 +76,10 @@ def update_settings(data: SettingsUpdate):
         settings.top_p = data.top_p
     if data.field_max_tokens is not None:
         settings.field_max_tokens_json = _json.dumps(data.field_max_tokens)
+    if data.include_reasoning is not None:
+        settings.include_reasoning = data.include_reasoning
+    if data.reasoning_effort is not None:
+        settings.reasoning_effort = data.reasoning_effort
 
     persist_settings()
     return {"ok": True}
@@ -113,7 +129,11 @@ def list_models():
             r.raise_for_status()
             data = r.json()
             models = [
-                {"id": m["id"], "name": m.get("name", m["id"])}
+                {
+                    "id": m["id"],
+                    "name": m.get("name", m["id"]),
+                    "supports_reasoning": "reasoning" in (m.get("supported_parameters") or []),
+                }
                 for m in data.get("data", [])
             ]
             return {"models": models}

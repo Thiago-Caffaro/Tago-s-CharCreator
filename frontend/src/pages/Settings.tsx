@@ -24,6 +24,11 @@ const SCOPE_OPTIONS = [
   { value: 'global', label: 'Global' },
   { value: 'per_field', label: 'Por Campo' },
 ]
+const REASONING_EFFORT_OPTIONS = [
+  { value: 'low', label: 'Baixo' },
+  { value: 'medium', label: 'Médio' },
+  { value: 'high', label: 'Alto' },
+]
 const RULE_FIELD_OPTIONS = [
   { value: '', label: 'Selecione o campo...' },
   ...CHARA_FIELDS.map(f => ({ value: f, label: f })),
@@ -32,6 +37,7 @@ const RULE_FIELD_OPTIONS = [
 interface ORModel {
   id: string
   name: string
+  supports_reasoning?: boolean
 }
 
 export function ModelPicker({
@@ -392,6 +398,10 @@ export default function Settings() {
   const [temperature, setTemperature] = useState(1.0)
   const [topP, setTopP] = useState(0.999)
   const [fieldMaxTokens, setFieldMaxTokens] = useState<Record<string, number>>({})
+  const [includeReasoning, setIncludeReasoning] = useState(false)
+  const [reasoningEffort, setReasoningEffort] = useState<'low' | 'medium' | 'high'>('medium')
+  const [reasoningModelIds, setReasoningModelIds] = useState<Set<string> | null>(null)
+  const [desiredTokens, setDesiredTokens] = useState<Record<string, [number, number]>>({})
   const [newRuleName, setNewRuleName] = useState('')
   const [newRuleContent, setNewRuleContent] = useState('')
   const [newRuleScope, setNewRuleScope] = useState<'global' | 'per_field'>('global')
@@ -405,6 +415,9 @@ export default function Settings() {
   useEffect(() => {
     fetchSettings().catch(() => {})
     rulesApi.list().then(setRules).catch(() => {})
+    client.get<{ models: ORModel[] }>('/settings/models')
+      .then(res => setReasoningModelIds(new Set(res.data.models.filter(m => m.supports_reasoning).map(m => m.id))))
+      .catch(() => setReasoningModelIds(new Set()))
   }, [])
 
   useEffect(() => {
@@ -415,6 +428,9 @@ export default function Settings() {
       setTemperature(settings.temperature)
       setTopP(settings.top_p)
       setFieldMaxTokens(settings.field_max_tokens ?? {})
+      setIncludeReasoning(settings.include_reasoning ?? false)
+      setReasoningEffort(settings.reasoning_effort ?? 'medium')
+      setDesiredTokens(settings.field_desired_tokens ?? {})
     }
   }, [settings])
 
@@ -429,6 +445,8 @@ export default function Settings() {
         temperature,
         top_p: topP,
         field_max_tokens: fieldMaxTokens,
+        include_reasoning: includeReasoning,
+        reasoning_effort: reasoningEffort,
       })
       setApiKey('')
       toast.success('Configurações salvas!')
@@ -611,12 +629,17 @@ export default function Settings() {
         <ProviderPicker model={model} value={provider} onChange={setProvider} />
 
         <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Max Tokens"
-            type="number"
-            value={maxTokens}
-            onChange={e => setMaxTokens(Number(e.target.value))}
-          />
+          <div className="col-span-2">
+            <Input
+              label="Max Tokens — Refinar / Lorebook / Reparo de JSON"
+              type="number"
+              value={maxTokens}
+              onChange={e => setMaxTokens(Number(e.target.value))}
+            />
+            <p className="text-[10px] text-gray-600 mt-1">
+              Não afeta a geração de card completo nem campo-a-campo — essas usam os limites por campo abaixo.
+            </p>
+          </div>
           <Input
             label="Temperature"
             type="number"
@@ -637,6 +660,36 @@ export default function Settings() {
           />
         </div>
 
+        <div className="space-y-3 p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg">
+          <div className="flex items-start gap-3">
+            <Toggle checked={includeReasoning} onChange={setIncludeReasoning} />
+            <div className="flex-1 -mt-0.5">
+              <p className="text-xs text-gray-300 font-medium">Thinking / Reasoning</p>
+              <p className="text-[10px] text-gray-600">
+                Deixa o modelo "pensar" antes de responder — pode melhorar a qualidade em modelos que suportam,
+                mas consome tokens extras e é mais lento. Modelos sem suporte simplesmente ignoram a opção.
+              </p>
+              {reasoningModelIds && model && (
+                reasoningModelIds.has(model) ? (
+                  <p className="text-[10px] text-emerald-500 mt-1">✓ {model} suporta reasoning</p>
+                ) : (
+                  <p className="text-[10px] text-amber-500 mt-1">
+                    ⚠ Não detectamos suporte a reasoning em {model} — a opção pode não ter efeito
+                  </p>
+                )
+              )}
+            </div>
+          </div>
+          {includeReasoning && (
+            <Select
+              label="Esforço de raciocínio"
+              value={reasoningEffort}
+              onChange={e => setReasoningEffort(e.target.value as 'low' | 'medium' | 'high')}
+              options={REASONING_EFFORT_OPTIONS}
+            />
+          )}
+        </div>
+
         <Button loading={saving} onClick={handleSaveSettings}>Salvar</Button>
       </section>
 
@@ -647,9 +700,11 @@ export default function Settings() {
             Tokens por Campo — Geração Chunked
           </h2>
           <p className="text-xs text-gray-600 mt-0.5">
-            Cada campo é gerado em uma chamada separada. Aumente o limite se o campo estiver sendo cortado
-            (finish_reason: <span className="font-mono text-gray-500">length</span> no OpenRouter).
-            Diminua se quiser economizar créditos.
+            Cada campo é gerado em uma chamada separada. "Max tokens" é o teto técnico — aumente se o campo
+            estiver sendo cortado (finish_reason: <span className="font-mono text-gray-500">length</span> no
+            OpenRouter). "Tamanho desejado" é só uma referência de quanto o campo deveria realmente ocupar —
+            campos permanentes (description, personality, scenario) pesam no contexto de toda geração futura,
+            então maior não é melhor por padrão.
           </p>
         </div>
 
@@ -668,8 +723,15 @@ export default function Settings() {
                 ${i < CHUNKED_FIELDS.length - 1 ? 'border-b border-[#242424]' : ''}`}
             >
               <div className="min-w-0">
-                <span className="text-xs font-mono text-gray-300">{label}</span>
-                <span className="text-[10px] text-gray-600 ml-2">{hint}</span>
+                <div>
+                  <span className="text-xs font-mono text-gray-300">{label}</span>
+                  <span className="text-[10px] text-gray-600 ml-2">{hint}</span>
+                </div>
+                {desiredTokens[key] && (
+                  <span className="text-[10px] text-gray-700">
+                    Tamanho desejado: ~{desiredTokens[key][0]}–{desiredTokens[key][1]} tokens
+                  </span>
+                )}
               </div>
               <input
                 type="number"
