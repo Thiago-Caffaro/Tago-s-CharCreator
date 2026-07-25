@@ -5,7 +5,7 @@ import json
 
 from ..database import get_session
 from ..config import settings, persist_settings
-from ..models.generation_rule import GenerationRule
+from ..models.generation_rule import GenerationRule, RuleScope
 from ..models.field_preset import FieldPreset
 from ..models.card_type_config import CardTypeConfig
 from ..models.project_template import ProjectTemplate
@@ -87,11 +87,10 @@ def import_config(data: dict, session: Session = Depends(get_session)):
 
     Settings are applied in place (same semantics as PUT /api/settings — the
     API key is never touched, whether or not the imported file has one).
-    Rules/presets always create new rows, matching the existing presets
-    import behavior. Card types are skipped when their slug already exists,
-    since the slug column is unique. Templates are matched by name and
-    overwritten in place when one already exists, since re-importing the
-    same backup is a common flow and shouldn't pile up duplicates.
+    Rules/presets/templates are matched by name and card types by slug —
+    an existing match is updated in place, everything else is created new.
+    Re-importing the same backup is a common flow (refresh after editing
+    elsewhere, restore) and shouldn't pile up duplicates each time.
     """
     counts = {"rules": 0, "presets": 0, "card_types": 0, "templates": 0}
 
@@ -115,54 +114,63 @@ def import_config(data: dict, session: Session = Depends(get_session)):
             settings.reasoning_effort = s["reasoning_effort"]
         persist_settings()
 
+    existing_rules = {r.name: r for r in session.exec(select(GenerationRule)).all()}
     for r in data.get("rules", []):
-        session.add(GenerationRule(
-            name=r.get("name", "Imported Rule"),
-            content=r.get("content", ""),
-            scope=r.get("scope", "global"),
-            target_field=r.get("target_field"),
-            is_active=r.get("is_active", True),
-            order_index=r.get("order_index", 0),
-        ))
+        name = r.get("name", "Imported Rule")
+        existing = existing_rules.get(name)
+        target = existing or GenerationRule(name=name)
+        target.content = r.get("content", "")
+        # Plain attribute assignment on an existing row skips Pydantic's
+        # constructor-time coercion, so convert explicitly rather than
+        # relying on a bare string matching the enum's value by coincidence.
+        target.scope = RuleScope(r.get("scope", "global"))
+        target.target_field = r.get("target_field")
+        target.is_active = r.get("is_active", True)
+        target.order_index = r.get("order_index", 0)
+        session.add(target)
+        existing_rules[name] = target
         counts["rules"] += 1
 
+    existing_presets = {p.name: p for p in session.exec(select(FieldPreset)).all()}
     for p in data.get("presets", []):
-        session.add(FieldPreset(
-            name=p.get("name", "Imported Preset"),
-            target_field=p.get("target_field", "description"),
-            system_prompt_override=p.get("system_prompt_override", ""),
-            is_default=p.get("is_default", False),
-            is_voice=p.get("is_voice", False),
-        ))
+        name = p.get("name", "Imported Preset")
+        existing = existing_presets.get(name)
+        target = existing or FieldPreset(name=name)
+        target.target_field = p.get("target_field", "description")
+        target.system_prompt_override = p.get("system_prompt_override", "")
+        target.is_default = p.get("is_default", False)
+        target.is_voice = p.get("is_voice", False)
+        session.add(target)
+        existing_presets[name] = target
         counts["presets"] += 1
 
-    existing_slugs = {c.slug for c in session.exec(select(CardTypeConfig)).all()}
+    existing_types = {c.slug: c for c in session.exec(select(CardTypeConfig)).all()}
     for c in data.get("card_types", []):
         slug = c.get("slug", "")
-        if not slug or slug in existing_slugs:
+        if not slug:
             continue
-        session.add(CardTypeConfig(
-            slug=slug,
-            label=c.get("label", slug),
-            color=c.get("color", "#888888"),
-            order_index=c.get("order_index", 0),
-            is_builtin=False,
-        ))
-        existing_slugs.add(slug)
+        existing = existing_types.get(slug)
+        if existing and existing.is_builtin:
+            # Never overwrite a builtin's own row — it's re-seeded on every
+            # startup anyway, so a same-slug import would only ever be a
+            # coincidental collision, not the same conceptual item.
+            continue
+        target = existing or CardTypeConfig(slug=slug, is_builtin=False)
+        target.label = c.get("label", slug)
+        target.color = c.get("color", "#888888")
+        target.order_index = c.get("order_index", 0)
+        session.add(target)
+        existing_types[slug] = target
         counts["card_types"] += 1
 
     existing_templates = {t.name: t for t in session.exec(select(ProjectTemplate)).all()}
     for t in data.get("templates", []):
         name = t.get("name", "Imported Template")
-        cards_json = t.get("cards_json", "[]")
         existing = existing_templates.get(name)
-        if existing:
-            existing.cards_json = cards_json
-            session.add(existing)
-        else:
-            created = ProjectTemplate(name=name, cards_json=cards_json)
-            session.add(created)
-            existing_templates[name] = created
+        target = existing or ProjectTemplate(name=name)
+        target.cards_json = t.get("cards_json", "[]")
+        session.add(target)
+        existing_templates[name] = target
         counts["templates"] += 1
 
     session.commit()
