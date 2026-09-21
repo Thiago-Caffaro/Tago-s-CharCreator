@@ -1,5 +1,6 @@
 from openai import OpenAI
 from ..config import settings
+import re
 
 _client: OpenAI | None = None
 
@@ -141,3 +142,70 @@ def count_tokens(system: str, user: str) -> int:
     # OpenRouter has no counting endpoint — simple character-based estimate
     total_chars = len(system) + len(user)
     return total_chars // 4
+
+
+def complete_message(
+    system: str,
+    user: str,
+    runtime: dict,
+    max_tokens: int | None = None,
+    model: str | None = None,
+    temperature: float | None = None,
+    top_p: float | None = None,
+    user_id: int | None = None,
+) -> tuple[str, dict]:
+    """Server-owned completion used by persistent jobs.
+
+    It consumes the entire provider stream even when no browser is connected and
+    captures the final usage-only chunk requested via include_usage.
+    """
+    client = OpenAI(api_key=runtime["openrouter_api_key"], base_url=settings.openrouter_base_url)
+    extra_body: dict = {}
+    if runtime.get("include_reasoning"):
+        extra_body["reasoning"] = {"effort": runtime.get("reasoning_effort", "medium")}
+    else:
+        extra_body["reasoning"] = {"exclude": True, "effort": "none"}
+        extra_body["include_reasoning"] = False
+    if runtime.get("repetition_penalty", 1.0) != 1.0:
+        extra_body["repetition_penalty"] = runtime["repetition_penalty"]
+    if runtime.get("preferred_provider"):
+        extra_body["provider"] = {"only": [runtime["preferred_provider"]]}
+    selected_model = model or runtime["default_model"]
+    request_args = dict(
+        model=selected_model,
+        max_tokens=max_tokens or runtime["max_tokens"],
+        temperature=temperature if temperature is not None else runtime["temperature"],
+        top_p=top_p if top_p is not None else runtime["top_p"],
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        stream=True,
+        stream_options={"include_usage": True},
+        extra_body=extra_body,
+    )
+    if user_id is not None:
+        request_args["user"] = str(user_id)
+    stream = client.chat.completions.create(**request_args)
+    pieces: list[str] = []
+    usage = None
+    for chunk in stream:
+        if getattr(chunk, "usage", None) is not None:
+            usage = chunk.usage
+        choices = getattr(chunk, "choices", None) or []
+        if choices:
+            delta = choices[0].delta
+            content = getattr(delta, "content", None)
+            if content:
+                pieces.append(content)
+    text = "".join(pieces)
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S | re.I).strip()
+    prompt = getattr(usage, "prompt_tokens", None) if usage else None
+    completion = getattr(usage, "completion_tokens", None) if usage else None
+    actual = prompt is not None and completion is not None
+    prompt = int(prompt if prompt is not None else count_tokens(system, user))
+    completion = int(completion if completion is not None else max(0, len(text) // 4))
+    return text, {
+        "model": selected_model,
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": prompt + completion,
+        "is_estimated": not actual,
+    }

@@ -3,7 +3,9 @@ import { NavLink, useParams } from 'react-router-dom'
 import {
   LayoutDashboard, PenTool, BookOpen, Settings,
   Layers, BookMarked, FileOutput,
+  UserCircle, Shield,
 } from 'lucide-react'
+import { useAuthStore } from '../../store/useAuthStore'
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -36,9 +38,14 @@ function ProjectNav({ projectId }: { projectId: string }) {
           Editor
         </NavLink>
 
+        <NavLink to={`/editor/${projectId}/generate`} className={navCls}>
+          <Layers size={14} />
+          Gerar
+        </NavLink>
+
         <NavLink to={`/editor/${projectId}/output`} className={navCls}>
           <FileOutput size={14} />
-          Output
+          Resultado
         </NavLink>
 
         <NavLink to={`/editor/${projectId}/lorebook`} className={navCls}>
@@ -52,6 +59,7 @@ function ProjectNav({ projectId }: { projectId: string }) {
 
 export function Sidebar() {
   const { projectId } = useParams()
+  const user = useAuthStore(s => s.user)
 
   return (
     <aside className="w-[220px] bg-[#1a1a1a] border-r border-[#2a2a2a] flex flex-col shrink-0">
@@ -81,6 +89,8 @@ export function Sidebar() {
           <Settings size={15} />
           Configurações
         </NavLink>
+        {user?.role === 'admin' && <NavLink to="/admin" className={navCls}><Shield size={15}/> Administração</NavLink>}
+        <NavLink to="/account" className={navCls}><UserCircle size={15}/> {user?.username || 'Conta'}</NavLink>
       </div>
     </aside>
   )

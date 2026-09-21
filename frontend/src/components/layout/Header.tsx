@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import { useProjectStore } from '../../store/useProjectStore'
 
 const ROUTE_LABELS: Record<string, string> = {
+  generate:   'Gerar',
   output:     'Output',
   lorebook:   'Lorebook',
   generating: 'Gerando...',

@@ -14,12 +14,15 @@ services:
       MAX_TOKENS: ${MAX_TOKENS:-8192}
       TEMPERATURE: ${TEMPERATURE:-1.0}
       TOP_P: ${TOP_P:-0.999}
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-changeme}
+      APP_SECRET_FILE: ${APP_SECRET_FILE:-data/app.secret}
       CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}"
     networks:
       - internal
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/projects')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3

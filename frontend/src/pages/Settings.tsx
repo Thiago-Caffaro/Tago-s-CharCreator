@@ -481,8 +481,8 @@ export default function Settings() {
       const result = await configApi.importConfig(data)
       await fetchSettings()
       rulesApi.list().then(setRules).catch(() => {})
-      const { rules: nR = 0, presets: nP = 0, card_types: nC = 0, templates: nT = 0 } = result.imported || {}
-      toast.success(`Importado: ${nR} regra(s), ${nP} preset(s), ${nC} tipo(s) de card, ${nT} template(s)`)
+      const total = Object.values(result.imported || {}).reduce((sum, item) => sum + item.created + item.updated, 0)
+      toast.success(`${total} item(ns) criado(s) ou atualizado(s), sem duplicar equivalentes`)
     } catch {
       toast.error('Erro ao importar configurações')
     } finally {
@@ -554,7 +554,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-8">
       <h1 className="text-xl font-semibold text-gray-100">Configurações</h1>
 
       <section className="space-y-3">
@@ -628,8 +628,8 @@ export default function Settings() {
 
         <ProviderPicker model={model} value={provider} onChange={setProvider} />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
             <Input
               label="Max Tokens — Refinar / Lorebook / Reparo de JSON"
               type="number"

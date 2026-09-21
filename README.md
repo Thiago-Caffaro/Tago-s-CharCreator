@@ -48,6 +48,32 @@ docker compose up -d
 
 Acesse em http://localhost:3000
 
+No primeiro start, entre com as credenciais definidas em `.env`:
+
+```text
+INITIAL_ADMIN_USERNAME=admin
+INITIAL_ADMIN_PASSWORD=changeme
+```
+
+Troque a senha pelo painel administrativo. A chave OpenRouter configurada no
+`.env` antigo é migrada para a conta administrativa; depois disso cada usuário
+mantém sua própria chave e preferências em **Configurações**.
+
+Antes da primeira migração multiusuário, o backend cria automaticamente
+`data/backups/pre-accounts-20260921_01.db`. A migração é versionada por Alembic.
+
+### Testes
+
+```powershell
+backend\venv\Scripts\python.exe -m pytest -q
+cd frontend
+npm run build
+npm run test:e2e
+```
+
+Na primeira execução do E2E, instale o Chromium com
+`npx playwright install chromium`.
+
 ---
 
 ## Estrutura
@@ -64,6 +90,8 @@ Acesse em http://localhost:3000
 - Lorebook editor completo com geração por IA, testador de keywords e import/export
 - Quality checklist automático para o card gerado
 - Histórico de gerações por projeto, com restauração de versões anteriores
+- Contas internas isoladas, painel administrativo e consumo de tokens por usuário
+- Jobs de geração persistentes no servidor, recuperáveis após fechar ou recarregar a página
 - Exportação de `.json` e `.png` (com avatar embutido) compatível com SillyTavern
 - Importação de character cards de outros apps (SillyTavern/Chub, `.png` ou `.json`)
 - Seed automático de regras globais e field presets

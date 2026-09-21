@@ -6,11 +6,14 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export function Textarea({ label, error, className = '', ...props }: TextareaProps) {
+  const generatedId = React.useId()
+  const textareaId = props.id || generatedId
   return (
     <div className="flex flex-col gap-1 flex-1">
-      {label && <label className="text-xs font-medium text-gray-400">{label}</label>}
+      {label && <label htmlFor={textareaId} className="text-xs font-medium text-gray-400">{label}</label>}
       <textarea
         {...props}
+        id={textareaId}
         className={`bg-[#1a1a1a] border border-[#333] rounded-md px-3 py-2 text-sm text-gray-100
           placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-[#9b59b6]/50 focus:border-[#9b59b6]
           transition-colors resize-none font-mono ${error ? 'border-red-500' : ''} ${className}`}

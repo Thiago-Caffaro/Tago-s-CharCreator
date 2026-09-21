@@ -1,464 +1,52 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Loader2, Circle, ChevronDown, ChevronUp, Wand2, AlertCircle } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { AlertCircle, CheckCircle2, Circle, Loader2, StopCircle, Wand2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { generationApi } from '../api/generation'
+import type { GenerationJob } from '../types'
 import { useGenerationStore } from '../store/useGenerationStore'
 import { useProjectStore } from '../store/useProjectStore'
-import { validate_card_client } from '../utils/validators'
 
-// The same ordered list as the backend's _CHUNKED_FIELDS
-const CHUNKED_FIELDS = [
-  'description',
-  'personality',
-  'scenario',
-  'first_mes',
-  'mes_example',
-  'system_prompt',
-  'post_history_instructions',
-  'alternate_greetings',
-]
-
-const FIELD_LABELS: Record<string, string> = {
-  description:               'Aparência & Personalidade',
-  personality:               'Personalidade (resumo)',
-  scenario:                  'Cenário',
-  first_mes:                 'Primeira Mensagem',
-  mes_example:               'Exemplos de Mensagem',
-  system_prompt:             'System Prompt',
-  post_history_instructions: 'Post-History',
-  alternate_greetings:       'Saudações Alternativas',
-}
-
-type FieldStatus = 'pending' | 'generating' | 'done' | 'error'
+const LABELS: Record<string, string> = { description: 'Descrição', personality: 'Personalidade', scenario: 'Cenário', first_mes: 'Primeira Mensagem', mes_example: 'Exemplos', system_prompt: 'System Prompt', post_history_instructions: 'Post-History', alternate_greetings: 'Saudações Alternativas' }
 
 export default function GeneratingPage() {
-  const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
-  const { currentProject, updateProject } = useProjectStore()
+  const { projectId } = useParams(); const [params, setParams] = useSearchParams(); const navigate = useNavigate()
+  const [job, setJob] = useState<GenerationJob | null>(null); const [loading, setLoading] = useState(true)
+  const { setGeneratedCard } = useGenerationStore(); const { fetchProject } = useProjectStore()
+  const jobId = Number(params.get('job')) || null
 
-  const {
-    selectedPresetIds,
-    setGeneratedCard,
-    setFullCardStreaming,
-    fieldStatuses,
-    fieldContents,
-    liveFieldText,
-    generationComplete,
-    setFieldStatus,
-    setFieldContent,
-    appendLiveFieldText,
-    clearLiveFieldText,
-    resetFieldProgress,
-    setGenerationComplete,
-  } = useGenerationStore()
-
-  const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set())
-  const liveScrollRef = useRef<HTMLDivElement>(null)
-  const hasStarted = useRef(false)
-
-  // Auto-scroll the live block while streaming
   useEffect(() => {
-    if (liveScrollRef.current) {
-      liveScrollRef.current.scrollTop = liveScrollRef.current.scrollHeight
-    }
-  }, [liveFieldText])
-
-  // Kick off generation once on mount
-  useEffect(() => {
-    if (hasStarted.current) return
-    hasStarted.current = true
-
-    const pid = Number(projectId)
-    let pendingLine = ''
-    let afterDone = false
-    let currentFieldName = ''
-    let currentFieldContent = ''
-
-    setFullCardStreaming(true)
-
-    const run = async () => {
+    let stopped = false; let timer: number | undefined
+    const load = async () => {
       try {
-        const result = await generationApi.fullCard(
-          pid,
-          selectedPresetIds,
-          (chunk: string) => {
-            const combined = pendingLine + chunk
-            const lines = combined.split('\n')
-            pendingLine = lines.pop() ?? ''
-
-            for (const line of lines) {
-              if (line.startsWith('__FIELD__:')) {
-                // Finalise the previous field before starting the next
-                if (currentFieldName) {
-                  setFieldContent(currentFieldName, currentFieldContent.trim())
-                  setFieldStatus(currentFieldName, 'done')
-                  clearLiveFieldText()
-                }
-                currentFieldName = line.slice('__FIELD__:'.length)
-                currentFieldContent = ''
-                setFieldStatus(currentFieldName, 'generating')
-              } else if (line === '__DONE__') {
-                // Finalise the last field
-                if (currentFieldName) {
-                  setFieldContent(currentFieldName, currentFieldContent.trim())
-                  setFieldStatus(currentFieldName, 'done')
-                  clearLiveFieldText()
-                }
-                afterDone = true
-              } else if (!afterDone) {
-                currentFieldContent += line + '\n'
-                appendLiveFieldText(line + '\n')
-              }
-            }
-          },
-        )
-
-        // Flush any partial line left in the buffer
-        if (pendingLine && !afterDone && currentFieldName) {
-          currentFieldContent += pendingLine
-          setFieldContent(currentFieldName, currentFieldContent.trim())
-          setFieldStatus(currentFieldName, 'done')
-          clearLiveFieldText()
+        let target = jobId
+        if (!target) {
+          const active = await generationApi.listJobs(Number(projectId), true)
+          target = active[0]?.id || null
+          if (target) setParams({ job: String(target) }, { replace: true })
         }
-
-        // Extract assembled JSON (everything after __DONE__\n)
-        const doneIdx = result.indexOf('__DONE__\n')
-        const jsonStr = doneIdx >= 0 ? result.slice(doneIdx + 9) : result
-
-        // Always persist the latest raw JSON so the Output page always shows
-        // the NEW generation — even if it has structural problems.
-        if (jsonStr.trim()) {
-          await updateProject(pid, { last_generated_card: jsonStr })
-        }
-
-        const { ok, card } = validate_card_client(jsonStr)
-        if (ok && card) {
-          setGeneratedCard(card)
-          setGenerationComplete(true)
-          toast.success('Card gerado com sucesso!')
-        } else {
-          // Don't set generatedCard — Output will fall through to
-          // last_generated_card (the broken JSON we just saved) and open
-          // the JSON tab with error indicators + the AI fix button.
-          toast.error('JSON com problemas — corrija no Output.')
-          CHUNKED_FIELDS.forEach(f => {
-            if ((fieldStatuses[f] as string) === 'generating') setFieldStatus(f, 'error')
-          })
-          setGenerationComplete(true)
-        }
-      } catch (e: any) {
-        toast.error(e.message || 'Erro na geração')
-        if (currentFieldName) setFieldStatus(currentFieldName, 'error')
-        setGenerationComplete(true)
-      } finally {
-        setFullCardStreaming(false)
-      }
+        if (!target) { setLoading(false); return }
+        const next = await generationApi.getJob(target)
+        if (stopped) return
+        setJob(next); setLoading(false)
+        if (next.status === 'completed') {
+          try { if (next.result_json) setGeneratedCard(JSON.parse(next.result_json)); await fetchProject(Number(projectId)) } catch {}
+        } else if (next.status === 'queued' || next.status === 'running') timer = window.setTimeout(load, 900)
+      } catch (e: any) { if (!stopped) { setLoading(false); toast.error(e?.response?.data?.detail || 'Não foi possível recuperar a geração') } }
     }
+    load(); return () => { stopped = true; if (timer) clearTimeout(timer) }
+  }, [jobId, projectId])
 
-    run()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // ── Stats ──────────────────────────────────────────────────────────────────
-  const allDoneText = Object.values(fieldContents).join(' ')
-  const combinedText = allDoneText + ' ' + liveFieldText
-  const totalWords = combinedText.trim()
-    ? combinedText.trim().split(/\s+/).filter(Boolean).length
-    : 0
-  const totalChars = Object.values(fieldContents).reduce((s, c) => s + c.length, 0)
-    + liveFieldText.length
-  const estimatedTokens = Math.round(totalChars / 4)
-  const estimatedKB = ((totalChars * 1.35) / 1024).toFixed(1)
-  const completedCount = CHUNKED_FIELDS.filter(
-    f => fieldStatuses[f] === 'done' || fieldStatuses[f] === 'error',
-  ).length
-  const activeField = CHUNKED_FIELDS.find(f => fieldStatuses[f] === 'generating')
-
-  const toggleExpand = (field: string) => {
-    setExpandedFields(prev => {
-      const next = new Set(prev)
-      if (next.has(field)) next.delete(field)
-      else next.add(field)
-      return next
-    })
-  }
-
-  return (
-    <div className="flex flex-col h-full bg-[#0f0f0f]">
-
-      {/* ── Desktop header ── */}
-      <div className="hidden lg:flex border-b border-[#2a2a2a] px-6 py-4 items-center gap-4 shrink-0 bg-[#111111]">
-        <button
-          onClick={() => navigate(`/editor/${projectId}`)}
-          className="text-gray-500 hover:text-gray-300 text-sm transition-colors"
-        >
-          ← Voltar
-        </button>
-        <div className="flex items-center gap-2">
-          <Wand2 size={16} className="text-[#9b59b6]" />
-          <span className="text-white font-semibold text-sm">
-            Gerando Card
-            {currentProject ? (
-              <span className="text-gray-400 font-normal"> — {currentProject.character_name}</span>
-            ) : null}
-          </span>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          {!generationComplete ? (
-            <span className="text-xs text-gray-500 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#9b59b6] animate-pulse inline-block" />
-              {completedCount} / {CHUNKED_FIELDS.length} campos
-            </span>
-          ) : (
-            <span className="text-xs text-green-400 flex items-center gap-1.5">
-              <CheckCircle2 size={13} /> Concluído
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Mobile status bar ── */}
-      <div className="flex lg:hidden border-b border-[#2a2a2a] px-4 py-2 items-center justify-between bg-[#1a1a1a] shrink-0">
-        <div className="flex items-center gap-2">
-          <Wand2 size={14} className="text-[#9b59b6]" />
-          <span className="text-xs font-semibold text-gray-300">Gerando Card</span>
-        </div>
-        {!generationComplete ? (
-          <span className="text-xs text-gray-500 flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#9b59b6] animate-pulse inline-block" />
-            {completedCount}/{CHUNKED_FIELDS.length} campos
-          </span>
-        ) : (
-          <span className="text-xs text-green-400 flex items-center gap-1.5">
-            <CheckCircle2 size={12} /> Concluído
-          </span>
-        )}
-      </div>
-
-      {/* ── Desktop stats bar (full labels) ── */}
-      <div className="hidden lg:flex border-b border-[#2a2a2a] px-6 py-2.5 items-center gap-8 bg-[#141414] shrink-0">
-        <StatPill label="Palavras geradas" value={totalWords.toLocaleString('pt-BR')} />
-        <StatPill label="Tamanho estimado" value={`~${estimatedKB} KB`} />
-        <StatPill label="Tokens de saída (est.)" value={estimatedTokens.toLocaleString('pt-BR')} />
-        {activeField && (
-          <span className="ml-auto text-xs text-[#9b59b6] flex items-center gap-1.5">
-            <Loader2 size={12} className="animate-spin" />
-            {FIELD_LABELS[activeField] ?? activeField}
-          </span>
-        )}
-      </div>
-
-      {/* ── Mobile stats (scrollable row) ── */}
-      <div className="lg:hidden border-b border-[#2a2a2a] bg-[#141414] shrink-0">
-        <div className="flex items-center gap-6 px-4 py-2 overflow-x-auto">
-          <StatPill label="Palavras" value={totalWords.toLocaleString('pt-BR')} />
-          <StatPill label="Tamanho" value={`~${estimatedKB} KB`} />
-          <StatPill label="Tokens (est.)" value={estimatedTokens.toLocaleString('pt-BR')} />
-          {activeField && (
-            <span className="shrink-0 text-[11px] text-[#9b59b6] flex items-center gap-1">
-              <Loader2 size={11} className="animate-spin" />
-              {FIELD_LABELS[activeField] ?? activeField}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* ── Field blocks ── */}
-      <div className="flex-1 overflow-auto p-4 lg:p-6">
-        <div className="space-y-2 lg:max-w-3xl lg:mx-auto">
-          {CHUNKED_FIELDS.map(field => {
-            const status: FieldStatus = (fieldStatuses[field] as FieldStatus) ?? 'pending'
-            const content = fieldContents[field] ?? ''
-            const wordCount = content
-              ? content.trim().split(/\s+/).filter(Boolean).length
-              : 0
-            const liveWordCount = liveFieldText.trim()
-              ? liveFieldText.trim().split(/\s+/).filter(Boolean).length
-              : 0
-            const isExpanded = expandedFields.has(field)
-
-            return (
-              <FieldBlock
-                key={field}
-                label={FIELD_LABELS[field] ?? field}
-                status={status}
-                content={content}
-                liveText={status === 'generating' ? liveFieldText : ''}
-                wordCount={wordCount}
-                liveWordCount={liveWordCount}
-                isExpanded={isExpanded}
-                liveScrollRef={status === 'generating' ? liveScrollRef : undefined}
-                onToggleExpand={() => toggleExpand(field)}
-              />
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ── Desktop footer CTA ── */}
-      {generationComplete && (
-        <div className="hidden lg:flex border-t border-[#2a2a2a] px-6 py-4 items-center justify-between bg-[#141414] shrink-0">
-          <div className="text-xs text-gray-500">
-            {totalWords.toLocaleString('pt-BR')} palavras &middot; ~{estimatedKB} KB &middot; {estimatedTokens.toLocaleString('pt-BR')} tokens est.
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => { resetFieldProgress(); navigate(`/editor/${projectId}`) }}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              Editar Contexto
-            </button>
-            <button
-              onClick={() => navigate(`/editor/${projectId}/output`)}
-              className="px-5 py-2 text-sm bg-[#9b59b6] hover:bg-[#8e44ad] text-white rounded-lg font-medium transition-colors"
-            >
-              Ver Card →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Mobile footer CTA ── */}
-      {generationComplete && (
-        <div className="flex lg:hidden border-t border-[#2a2a2a] px-4 py-4 flex-col gap-3 bg-[#1a1a1a] shrink-0">
-          <p className="text-[11px] text-gray-600 text-center">
-            {totalWords.toLocaleString('pt-BR')} palavras · ~{estimatedKB} KB · {estimatedTokens.toLocaleString('pt-BR')} tokens
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => { resetFieldProgress(); navigate(`/editor/${projectId}`) }}
-              className="flex-1 py-3 text-sm text-gray-400 bg-[#242424] rounded-xl
-                border border-[#333] active:bg-[#2a2a2a] transition-colors"
-            >
-              Editar Contexto
-            </button>
-            <button
-              onClick={() => navigate(`/editor/${projectId}/output`)}
-              className="flex-1 py-3 text-sm bg-[#9b59b6] active:bg-[#8e44ad] text-white
-                rounded-xl font-semibold transition-colors"
-            >
-              Ver Card →
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────
-
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] text-gray-600 uppercase tracking-wider leading-none">{label}</span>
-      <span className="text-sm text-gray-200 font-mono leading-none">{value}</span>
-    </div>
-  )
-}
-
-interface FieldBlockProps {
-  label: string
-  status: FieldStatus
-  content: string
-  liveText: string
-  wordCount: number
-  liveWordCount: number
-  isExpanded: boolean
-  liveScrollRef?: React.RefObject<HTMLDivElement>
-  onToggleExpand: () => void
-}
-
-function FieldBlock({
-  label,
-  status,
-  content,
-  liveText,
-  wordCount,
-  liveWordCount,
-  isExpanded,
-  liveScrollRef,
-  onToggleExpand,
-}: FieldBlockProps) {
-  const isDone      = status === 'done'
-  const isGenerating = status === 'generating'
-  const isPending   = status === 'pending'
-  const isError     = status === 'error'
-
-  const borderClass =
-    isDone       ? 'border-[#1e3a1e] bg-[#131a13]' :
-    isGenerating ? 'border-[#3a1f50] bg-[#160e22]' :
-    isError      ? 'border-[#4a1a1a] bg-[#1a1010]' :
-    /* pending */  'border-[#222222] bg-[#131313] opacity-40'
-
-  return (
-    <div className={`rounded-xl border transition-all duration-200 ${borderClass}`}>
-
-      {/* Header row */}
-      <div
-        className={`flex items-center gap-3 px-4 py-3 ${isDone ? 'cursor-pointer select-none' : ''}`}
-        onClick={isDone ? onToggleExpand : undefined}
-      >
-        {/* Status icon */}
-        <span className="shrink-0 w-4 flex justify-center">
-          {isDone       && <CheckCircle2 size={15} className="text-green-500" />}
-          {isGenerating && <Loader2     size={15} className="text-[#9b59b6] animate-spin" />}
-          {isPending    && <Circle      size={15} className="text-gray-700" />}
-          {isError      && <AlertCircle size={15} className="text-red-500" />}
-        </span>
-
-        {/* Label */}
-        <span className={`text-sm font-medium flex-1 truncate ${
-          isDone       ? 'text-gray-200' :
-          isGenerating ? 'text-[#c07ee8]' :
-          isError      ? 'text-red-400' :
-          /* pending */  'text-gray-600'
-        }`}>
-          {label}
-        </span>
-
-        {/* Word count chips */}
-        {isDone && wordCount > 0 && (
-          <span className="text-[11px] text-gray-500 font-mono shrink-0">
-            {wordCount.toLocaleString('pt-BR')} pal.
-          </span>
-        )}
-        {isGenerating && (
-          <span className="text-[11px] text-[#9b59b6] font-mono shrink-0 animate-pulse">
-            {liveWordCount.toLocaleString('pt-BR')} pal.
-          </span>
-        )}
-
-        {/* Expand toggle for done blocks */}
-        {isDone && (
-          <span className="text-gray-600 shrink-0 ml-1">
-            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </span>
-        )}
-      </div>
-
-      {/* Live streaming content */}
-      {isGenerating && (
-        <div
-          ref={liveScrollRef}
-          className="px-4 pb-4 max-h-[320px] overflow-auto"
-        >
-          <pre className="text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed">
-            {liveText}
-            <span className="text-[#9b59b6] animate-pulse">█</span>
-          </pre>
-        </div>
-      )}
-
-      {/* Expanded content for done blocks */}
-      {isDone && isExpanded && (
-        <div className="px-4 pb-4 border-t border-[#1a2e1a]">
-          <pre className="mt-3 text-xs text-gray-400 font-mono whitespace-pre-wrap leading-relaxed max-h-[480px] overflow-auto">
-            {content}
-          </pre>
-        </div>
-      )}
-    </div>
-  )
+  if (loading) return <div className="h-full flex items-center justify-center text-gray-500"><Loader2 className="animate-spin mr-2"/> Recuperando geração…</div>
+  if (!job) return <div className="h-full flex flex-col items-center justify-center gap-4 p-6 text-center"><AlertCircle className="text-amber-400"/><p className="text-gray-300">Nenhuma geração ativa foi encontrada.</p><button onClick={() => navigate(`/editor/${projectId}`)} className="min-h-11 px-5 rounded-xl bg-[#9b59b6]">Voltar ao editor</button></div>
+  const complete = job.status === 'completed'; const terminal = complete || job.status === 'failed' || job.status === 'cancelled'
+  return <div className="h-full flex flex-col bg-[#0f0f0f]">
+    <header className="px-4 lg:px-6 py-4 border-b border-[#2a2a2a] flex items-center gap-3"><Wand2 size={18} className="text-[#9b59b6]"/><div><h1 className="text-sm font-semibold">Geração no servidor</h1><p className="text-xs text-gray-500">Pode fechar ou recarregar esta página sem interromper</p></div><span className="ml-auto text-xs text-gray-400">{job.completed_steps}/{job.total_steps}</span></header>
+    <main className="flex-1 overflow-auto p-4 lg:p-6"><div className="max-w-3xl mx-auto space-y-3">
+      {job.status === 'queued' && <div className="rounded-xl border border-amber-900/40 bg-amber-950/20 p-3 text-xs text-amber-300">Na fila deste usuário. A geração começará assim que o job anterior terminar.</div>}
+      {job.error && <div className="rounded-xl border border-red-900/50 bg-red-950/20 p-3 text-sm text-red-300">{job.error}</div>}
+      {(job.steps || []).map(step => <article key={step.key} className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4"><div className="flex items-center gap-3">{step.status === 'completed' ? <CheckCircle2 size={17} className="text-emerald-400"/> : step.status === 'running' ? <Loader2 size={17} className="animate-spin text-[#9b59b6]"/> : step.status === 'failed' ? <AlertCircle size={17} className="text-red-400"/> : <Circle size={17} className="text-gray-700"/>}<span className="text-sm font-medium">{LABELS[step.key] || step.key}</span><span className="ml-auto text-[10px] uppercase text-gray-600">{step.status}</span></div>{step.content && <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-gray-400 border-t border-[#2a2a2a] pt-3">{step.content}</pre>}</article>)}
+    </div></main>
+    <footer className="p-4 border-t border-[#2a2a2a] flex flex-col sm:flex-row gap-3 justify-end bg-[#141414]">{!terminal && <button onClick={async () => { await generationApi.cancelJob(job.id); setJob(await generationApi.getJob(job.id)) }} className="min-h-11 px-4 rounded-xl border border-red-900/50 text-red-400 flex items-center justify-center gap-2"><StopCircle size={16}/> Cancelar</button>}{terminal && <button onClick={() => navigate(`/editor/${projectId}`)} className="min-h-11 px-4 rounded-xl border border-[#333]">Editar contexto</button>}{complete && <button onClick={() => navigate(`/editor/${projectId}/output`)} className="min-h-11 px-5 rounded-xl bg-[#9b59b6] font-medium">Ver card</button>}{job.status === 'failed' && <button onClick={() => navigate(`/editor/${projectId}`)} className="min-h-11 px-5 rounded-xl bg-[#9b59b6]">Tentar novamente</button>}</footer>
+  </div>
 }

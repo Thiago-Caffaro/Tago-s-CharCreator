@@ -31,7 +31,7 @@ body {
 
 /* Bottom-nav padding — only on mobile/tablet */
 .mobile-nav-pb {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width: 1024px) {
   .mobile-nav-pb { padding-bottom: 0; }

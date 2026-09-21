@@ -5,27 +5,35 @@ from typing import List
 import json
 
 from ..database import get_session
+from ..auth import get_current_user
+from ..models.user import User
 from ..models.lorebook import LorebookEntry, LorebookEntryCreate, LorebookEntryRead, LorebookEntryUpdate
 from ..models.project import Project
 
 router = APIRouter(tags=["lorebook"])
 
+def _project(project_id: int, user: User, session: Session):
+    value = session.exec(select(Project).where(Project.id == project_id, Project.user_id == user.id)).first()
+    if not value: raise HTTPException(status_code=404, detail="Project not found")
+    return value
+
+def _entry(entry_id: int, user: User, session: Session):
+    value = session.exec(select(LorebookEntry).join(Project).where(LorebookEntry.id == entry_id, Project.user_id == user.id)).first()
+    if not value: raise HTTPException(status_code=404, detail="Entry not found")
+    return value
+
 
 @router.get("/api/projects/{project_id}/lorebook", response_model=List[LorebookEntryRead])
-def list_entries(project_id: int, session: Session = Depends(get_session)):
-    project = session.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+def list_entries(project_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    _project(project_id, user, session)
     return session.exec(
         select(LorebookEntry).where(LorebookEntry.project_id == project_id)
     ).all()
 
 
 @router.post("/api/projects/{project_id}/lorebook", response_model=LorebookEntryRead, status_code=201)
-def create_entry(project_id: int, data: LorebookEntryCreate, session: Session = Depends(get_session)):
-    project = session.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+def create_entry(project_id: int, data: LorebookEntryCreate, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    _project(project_id, user, session)
     entry = LorebookEntry(**data.model_dump(), project_id=project_id)
     session.add(entry)
     session.commit()
@@ -34,10 +42,8 @@ def create_entry(project_id: int, data: LorebookEntryCreate, session: Session = 
 
 
 @router.put("/api/lorebook/{entry_id}", response_model=LorebookEntryRead)
-def update_entry(entry_id: int, data: LorebookEntryUpdate, session: Session = Depends(get_session)):
-    entry = session.get(LorebookEntry, entry_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
+def update_entry(entry_id: int, data: LorebookEntryUpdate, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    entry = _entry(entry_id, user, session)
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(entry, key, value)
     session.add(entry)
@@ -47,19 +53,15 @@ def update_entry(entry_id: int, data: LorebookEntryUpdate, session: Session = De
 
 
 @router.delete("/api/lorebook/{entry_id}", status_code=204)
-def delete_entry(entry_id: int, session: Session = Depends(get_session)):
-    entry = session.get(LorebookEntry, entry_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Entry not found")
+def delete_entry(entry_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    entry = _entry(entry_id, user, session)
     session.delete(entry)
     session.commit()
 
 
 @router.get("/api/projects/{project_id}/lorebook/export")
-def export_lorebook(project_id: int, session: Session = Depends(get_session)):
-    project = session.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+def export_lorebook(project_id: int, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    project = _project(project_id, user, session)
     entries = session.exec(
         select(LorebookEntry).where(LorebookEntry.project_id == project_id)
     ).all()
@@ -111,7 +113,7 @@ def export_lorebook(project_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/api/projects/{project_id}/lorebook/import")
-def import_lorebook(project_id: int, data: dict, session: Session = Depends(get_session)):
+def import_lorebook(project_id: int, data: dict, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Import a SillyTavern World Info / lorebook JSON — the same shape /export produces.
 
     Real SillyTavern exports have no distinct display name field, only
@@ -119,9 +121,7 @@ def import_lorebook(project_id: int, data: dict, session: Session = Depends(get_
     own export additionally stuffs `entry.name` in for a clean round-trip,
     so prefer that when present and fall back to `comment` otherwise.
     """
-    project = session.get(Project, project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    _project(project_id, user, session)
 
     entries_data = data.get("entries", {})
     raw_entries = entries_data.values() if isinstance(entries_data, dict) else entries_data

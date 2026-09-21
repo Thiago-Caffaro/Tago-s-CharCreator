@@ -9,6 +9,7 @@ import { TokenCounter } from './TokenCounter'
 import { StreamingOutput } from './StreamingOutput'
 import { PresetMultiSelect } from './PresetMultiSelect'
 import { ProjectGenerationSettings } from './ProjectGenerationSettings'
+import { ProjectAvatarControl } from './ProjectAvatarControl'
 import { presetsApi } from '../../api/presets'
 import { generationApi } from '../../api/generation'
 import { useGenerationStore } from '../../store/useGenerationStore'
@@ -60,7 +61,15 @@ export function GenerationPanel({ projectId, desktop }: Props) {
     if (mode === 'full') {
       resetFieldProgress()
       setGeneratedCard(null)
-      navigate(`/editor/${projectId}/generating`)
+      setFieldStreaming(true)
+      try {
+        const job = await generationApi.createJob('full_card', projectId, { preset_ids: selectedPresetIds })
+        navigate(`/editor/${projectId}/generating?job=${job.id}`)
+      } catch (e: any) {
+        toast.error(e?.response?.data?.detail || 'Erro ao iniciar geração')
+      } finally {
+        setFieldStreaming(false)
+      }
       return
     }
 
@@ -88,6 +97,7 @@ export function GenerationPanel({ projectId, desktop }: Props) {
 
   const inner = (
     <div className="overflow-auto p-4 space-y-4 h-full">
+      <ProjectAvatarControl projectId={projectId} />
       <button
         onClick={() => setShowGenSettings(true)}
         className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs transition-colors ${
@@ -159,8 +169,8 @@ export function GenerationPanel({ projectId, desktop }: Props) {
 
       <Button
         onClick={handleGenerate}
-        loading={mode !== 'full' && fieldStreaming}
-        disabled={mode !== 'full' && fieldStreaming}
+        loading={fieldStreaming}
+        disabled={fieldStreaming}
         className="w-full justify-center"
         size="md"
       >

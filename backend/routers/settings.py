@@ -1,9 +1,16 @@
-from fastapi import APIRouter
+from datetime import datetime
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 import httpx
+from sqlmodel import Session
 
-from ..config import settings, persist_settings
+from ..auth import get_current_user
+from ..config import settings
+from ..database import get_session
+from ..models.user import User
+from ..services.security import encrypt_secret
+from ..services.user_settings import get_or_create_user_settings, settings_dict
 from ..services.prompt_assembler import FIELD_DESIRED_TOKENS
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -44,54 +51,59 @@ def _mask_key(key: str) -> str:
 
 
 @router.get("", response_model=SettingsRead)
-def get_settings():
+def get_settings(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    row = get_or_create_user_settings(session, user.id)
+    values = settings_dict(row)
     return SettingsRead(
-        api_key_masked=_mask_key(settings.openrouter_api_key),
-        default_model=settings.default_model,
-        preferred_provider=settings.preferred_provider,
-        max_tokens=settings.max_tokens,
-        temperature=settings.temperature,
-        top_p=settings.top_p,
-        field_max_tokens=settings.field_max_tokens,
-        include_reasoning=settings.include_reasoning,
-        reasoning_effort=settings.reasoning_effort,
+        api_key_masked=_mask_key(values["openrouter_api_key"]),
+        default_model=values["default_model"],
+        preferred_provider=values["preferred_provider"],
+        max_tokens=values["max_tokens"],
+        temperature=values["temperature"],
+        top_p=values["top_p"],
+        field_max_tokens=values["field_max_tokens"],
+        include_reasoning=values["include_reasoning"],
+        reasoning_effort=values["reasoning_effort"],
         field_desired_tokens={k: list(v) for k, v in FIELD_DESIRED_TOKENS.items()},
     )
 
 
 @router.put("")
-def update_settings(data: SettingsUpdate):
+def update_settings(data: SettingsUpdate, user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     import json as _json
+    row = get_or_create_user_settings(session, user.id)
     if data.openrouter_api_key is not None:
-        settings.openrouter_api_key = data.openrouter_api_key
+        row.api_key_encrypted = encrypt_secret(data.openrouter_api_key)
     if data.default_model is not None:
-        settings.default_model = data.default_model
+        row.default_model = data.default_model
     if data.preferred_provider is not None:
-        settings.preferred_provider = data.preferred_provider
+        row.preferred_provider = data.preferred_provider
     if data.max_tokens is not None:
-        settings.max_tokens = data.max_tokens
+        row.max_tokens = data.max_tokens
     if data.temperature is not None:
-        settings.temperature = data.temperature
+        row.temperature = data.temperature
     if data.top_p is not None:
-        settings.top_p = data.top_p
+        row.top_p = data.top_p
     if data.field_max_tokens is not None:
-        settings.field_max_tokens_json = _json.dumps(data.field_max_tokens)
+        row.field_max_tokens_json = _json.dumps(data.field_max_tokens)
     if data.include_reasoning is not None:
-        settings.include_reasoning = data.include_reasoning
+        row.include_reasoning = data.include_reasoning
     if data.reasoning_effort is not None:
-        settings.reasoning_effort = data.reasoning_effort
-
-    persist_settings()
+        row.reasoning_effort = data.reasoning_effort
+    row.updated_at = datetime.utcnow()
+    session.add(row)
+    session.commit()
     return {"ok": True}
 
 
 @router.get("/providers")
-def list_providers(model: str = ""):
+def list_providers(model: str = "", user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Returns providers available for a given model on OpenRouter."""
     try:
         headers = {}
-        if settings.openrouter_api_key:
-            headers["Authorization"] = f"Bearer {settings.openrouter_api_key}"
+        api_key = settings_dict(get_or_create_user_settings(session, user.id))["openrouter_api_key"]
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         with httpx.Client(timeout=10) as client:
             # OpenRouter exposes per-model endpoint info at /v1/models/<author>/<slug>
             if model:
@@ -118,12 +130,13 @@ def list_providers(model: str = ""):
 
 
 @router.get("/models")
-def list_models():
+def list_models(user: User = Depends(get_current_user), session: Session = Depends(get_session)):
     """Busca modelos disponíveis no OpenRouter."""
     try:
         headers = {}
-        if settings.openrouter_api_key:
-            headers["Authorization"] = f"Bearer {settings.openrouter_api_key}"
+        api_key = settings_dict(get_or_create_user_settings(session, user.id))["openrouter_api_key"]
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
         with httpx.Client(timeout=10) as client:
             r = client.get("https://openrouter.ai/api/v1/models", headers=headers)
             r.raise_for_status()

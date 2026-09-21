@@ -14,6 +14,7 @@ class ProjectTemplateBase(SQLModel):
 class ProjectTemplate(ProjectTemplateBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
 
 class TemplateCardInput(SQLModel):
