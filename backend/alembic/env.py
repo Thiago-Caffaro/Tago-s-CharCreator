@@ -1,13 +1,21 @@
 from logging.config import fileConfig
+from importlib import import_module
+from pathlib import Path
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from backend.config import settings
-from backend.models import *  # noqa: F401,F403
 from sqlmodel import SQLModel
 
+# Docker starts app.main while local development starts backend.main. Alembic
+# loads env.py by path; the caller passes its actual package name explicitly.
 config = context.config
+package_name = config.attributes.get(
+    "application_package", Path(__file__).resolve().parents[1].name
+)
+settings = import_module(f"{package_name}.config").settings
+import_module(f"{package_name}.models")
+
 config.set_main_option("sqlalchemy.url", settings.database_url)
 if config.config_file_name:
     fileConfig(config.config_file_name)
