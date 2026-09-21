@@ -32,6 +32,7 @@ def backup_legacy_database() -> None:
 def run_migrations() -> None:
     backup_legacy_database()
     cfg = Config()
+    cfg.attributes["application_package"] = __package__
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parent / "alembic"))
     cfg.set_main_option("sqlalchemy.url", settings.database_url)
     command.upgrade(cfg, "head")
