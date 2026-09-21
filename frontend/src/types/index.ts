@@ -106,6 +106,34 @@ export interface AppSettings {
   field_desired_tokens: Record<string, [number, number]>
 }
 
+export interface AuthUser {
+  id: number
+  username: string
+  role: 'admin' | 'user'
+  is_active: boolean
+  created_at: string
+}
+
+export type GenerationJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+export interface GenerationJobStep { key: string; status: string; content: string; error?: string }
+export interface GenerationJob {
+  id: number
+  user_id: number
+  project_id?: number
+  kind: string
+  status: GenerationJobStatus
+  result_json?: string
+  error?: string
+  current_step?: string
+  completed_steps: number
+  total_steps: number
+  cancel_requested: boolean
+  created_at: string
+  started_at?: string
+  completed_at?: string
+  steps?: GenerationJobStep[]
+}
+
 export const CARD_TYPE_LABELS: Record<CardType, string> = {
   appearance: 'Aparência',
   personality: 'Personalidade',

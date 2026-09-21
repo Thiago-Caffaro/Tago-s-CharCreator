@@ -32,7 +32,7 @@ DEFAULT_RULES: list[dict] = [
 ]
 
 
-def seed_default_rules(session: Session) -> int:
+def seed_default_rules(session: Session, user_id: int | None = None) -> int:
     """Creates any DEFAULT_RULES entries missing by name. Returns how many were created.
 
     Never touches an existing rule's content/scope/order — only fills in gaps
@@ -46,13 +46,16 @@ def seed_default_rules(session: Session) -> int:
     created = 0
     for rule_def in DEFAULT_RULES:
         existing = session.exec(
-            select(GenerationRule).where(GenerationRule.name == rule_def["name"])
+            select(GenerationRule).where(
+                GenerationRule.name == rule_def["name"],
+                GenerationRule.user_id == user_id,
+            )
         ).first()
         if existing:
             if not existing.is_builtin:
                 existing.is_builtin = True
                 session.add(existing)
         else:
-            session.add(GenerationRule(**rule_def, is_active=True, is_builtin=True))
+            session.add(GenerationRule(**rule_def, is_active=True, is_builtin=True, user_id=user_id))
             created += 1
     return created

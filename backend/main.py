@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -5,10 +7,20 @@ from sqlmodel import Session, select
 
 from .config import settings
 from .database import create_db_and_tables, engine
-from .routers import projects, context_cards, rules, presets, lorebook, generation, settings as settings_router
+from .routers import projects, context_cards, rules, presets, lorebook, settings as settings_router
 from .routers import card_types, project_templates, config_bundle
-from .models import FieldPreset, CardTypeConfig
+from .routers import auth as auth_router, admin as admin_router, generation_jobs as generation_jobs_router
+from .models import (
+    FieldPreset, CardTypeConfig, User, UserSettings, Project, GenerationRule,
+    ProjectTemplate, CardGeneration, ProjectAvatar,
+)
 from .services.default_data import seed_default_rules
+from .services.security import encrypt_secret, hash_password
+from .services.user_settings import get_or_create_user_settings
+from .migrations import run_migrations
+from .services.generation_jobs import manager as generation_manager
+import base64
+import re
 
 BUILTIN_CARD_TYPES = [
     ("appearance",    "Aparência",        "#3498db", 0),
@@ -25,12 +37,16 @@ BUILTIN_CARD_TYPES = [
 
 def _seed_preset(session: Session, name: str, target_field: str,
                  system_prompt_override: str, is_default: bool = False):
-    exists = session.exec(select(FieldPreset).where(FieldPreset.name == name)).first()
+    user_id = session.info.get("seed_user_id")
+    exists = session.exec(select(FieldPreset).where(
+        FieldPreset.name == name, FieldPreset.user_id == user_id
+    )).first()
     if not exists:
         session.add(FieldPreset(
             name=name, target_field=target_field,
             system_prompt_override=system_prompt_override,
             is_default=is_default,
+            user_id=user_id,
         ))
 
 
@@ -48,10 +64,12 @@ def _remove_legacy_presets(session: Session) -> int:
     they're gone, so this never needs to be removed later.
     """
     removed = 0
+    user_id = session.info.get("seed_user_id")
     for name, target_field in _LEGACY_PRESET_NAMES:
         preset = session.exec(
             select(FieldPreset).where(
-                FieldPreset.name == name, FieldPreset.target_field == target_field
+                FieldPreset.name == name, FieldPreset.target_field == target_field,
+                FieldPreset.user_id == user_id,
             )
         ).first()
         if preset:
@@ -60,9 +78,10 @@ def _remove_legacy_presets(session: Session) -> int:
     return removed
 
 
-def seed_default_data(session: Session):
+def seed_default_data(session: Session, user_id: int | None = None):
+    session.info["seed_user_id"] = user_id
     # ── Generation Rules ────────────────────────────────────────────────────
-    seed_default_rules(session)
+    seed_default_rules(session, user_id)
 
     # ── Description Presets ─────────────────────────────────────────────────
     _seed_preset(session,
@@ -411,22 +430,73 @@ WRONG behavioral anchor (description — don't write this):
 
     # ── Built-in Card Types ─────────────────────────────────────────────────
     for slug, label, color, order in BUILTIN_CARD_TYPES:
-        existing = session.exec(select(CardTypeConfig).where(CardTypeConfig.slug == slug)).first()
+        existing = session.exec(select(CardTypeConfig).where(
+            CardTypeConfig.slug == slug, CardTypeConfig.user_id == user_id
+        )).first()
         if not existing:
             session.add(CardTypeConfig(
                 slug=slug, label=label, color=color,
                 is_builtin=True, order_index=order,
+                user_id=user_id,
             ))
 
     session.commit()
+    session.info.pop("seed_user_id", None)
+
+
+def bootstrap_accounts(session: Session) -> User:
+    admin = session.exec(select(User).where(User.role == "admin").order_by(User.id)).first()
+    if not admin:
+        admin = User(
+            username=settings.initial_admin_username.strip() or "admin",
+            password_hash=hash_password(settings.initial_admin_password),
+            role="admin",
+        )
+        session.add(admin)
+        session.flush()
+
+    user_settings = get_or_create_user_settings(session, admin.id)
+    if not user_settings.api_key_encrypted and settings.openrouter_api_key:
+        user_settings.api_key_encrypted = encrypt_secret(settings.openrouter_api_key)
+        session.add(user_settings)
+
+    for model in (Project, GenerationRule, FieldPreset, CardTypeConfig, ProjectTemplate, CardGeneration):
+        for row in session.exec(select(model).where(model.user_id == None)).all():  # noqa: E711
+            row.user_id = admin.id
+            session.add(row)
+
+    session.flush()
+    # Migrate legacy data-URL avatars into the dedicated binary table.
+    for project in session.exec(select(Project).where(Project.user_id == admin.id)).all():
+        if not project.avatar or not project.avatar.startswith("data:image/"):
+            continue
+        if session.exec(select(ProjectAvatar).where(ProjectAvatar.project_id == project.id)).first():
+            continue
+        match = re.match(r"^data:(image/(?:png|jpeg|webp));base64,(.+)$", project.avatar, re.S)
+        if match:
+            try:
+                content = base64.b64decode(match.group(2), validate=True)
+                session.add(ProjectAvatar(project_id=project.id, mime_type=match.group(1), content=content))
+                project.avatar = f"/api/projects/{project.id}/avatar?v={int(datetime.utcnow().timestamp())}"
+                session.add(project)
+            except ValueError:
+                pass
+    session.commit()
+    seed_default_data(session, admin.id)
+    return admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    run_migrations()
     create_db_and_tables()
     with Session(engine) as session:
-        seed_default_data(session)
-    yield
+        bootstrap_accounts(session)
+    generation_manager.start()
+    try:
+        yield
+    finally:
+        generation_manager.stop()
 
 
 app = FastAPI(title="Tago's CharCreator API", version="1.0.0", lifespan=lifespan)
@@ -444,11 +514,15 @@ app.include_router(context_cards.router)
 app.include_router(rules.router)
 app.include_router(presets.router)
 app.include_router(lorebook.router)
-app.include_router(generation.router)
+# Legacy browser-owned streaming routes are intentionally no longer mounted;
+# every model call now goes through the durable generation-jobs API.
 app.include_router(settings_router.router)
 app.include_router(card_types.router)
 app.include_router(project_templates.router)
 app.include_router(config_bundle.router)
+app.include_router(auth_router.router)
+app.include_router(admin_router.router)
+app.include_router(generation_jobs_router.router)
 
 
 @app.get("/api/health")

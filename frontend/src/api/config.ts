@@ -9,5 +9,5 @@ export const configApi = {
   },
 
   importConfig: (data: object) =>
-    client.post<{ imported: Record<string, number> }>('/config/import', data).then(r => r.data),
+    client.post<{ imported: Record<string, { created: number; updated: number; ignored: number; errors: number }> }>('/config/import', data).then(r => r.data),
 }

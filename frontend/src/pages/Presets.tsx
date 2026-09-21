@@ -187,7 +187,7 @@ function PresetsTab() {
     <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-[#2a2a2a]">
+        <div className="flex flex-wrap items-center gap-2 px-4 lg:px-5 py-3 border-b border-[#2a2a2a]">
           <select
             value={fieldFilter}
             onChange={e => setFieldFilter(e.target.value)}
@@ -198,11 +198,11 @@ function PresetsTab() {
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar preset..." className="w-48" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar preset..." className="flex-1 min-w-[150px] lg:w-48 lg:flex-none" />
           <span className="text-xs text-gray-600">
             {filtered.length} preset{filtered.length !== 1 ? 's' : ''}
           </span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="w-full lg:w-auto lg:ml-auto grid grid-cols-3 lg:flex items-center gap-2">
             <input
               ref={importRef}
               type="file"
@@ -228,7 +228,7 @@ function PresetsTab() {
         </div>
 
         {/* Board */}
-        <div className="flex-1 overflow-auto p-5">
+        <div className="flex-1 overflow-auto p-4 lg:p-5">
           {loading ? (
             <div className="flex justify-center py-12">
               <span className="w-5 h-5 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
@@ -441,7 +441,7 @@ function TiposTab() {
   return (
     <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2a2a2a]">
+        <div className="flex items-center justify-between px-4 lg:px-5 py-3 border-b border-[#2a2a2a]">
           <span className="text-xs text-gray-600">
             {builtin.length} nativos · {custom.length} personalizados
           </span>
@@ -450,7 +450,7 @@ function TiposTab() {
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto p-5 space-y-6">
+        <div className="flex-1 overflow-auto p-4 lg:p-5 space-y-6">
           {loading ? (
             <div className="flex justify-center py-12">
               <span className="w-5 h-5 border-2 border-[#9b59b6] border-t-transparent rounded-full animate-spin" />
@@ -775,12 +775,12 @@ export default function Presets() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-1 px-5 pt-3 border-b border-[#2a2a2a] shrink-0">
+      <div className="flex items-center gap-1 px-2 lg:px-5 pt-2 lg:pt-3 border-b border-[#2a2a2a] shrink-0 overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-t-lg transition-colors border-b-2 -mb-px
+            className={`flex items-center gap-1.5 px-3 lg:px-4 min-h-11 text-xs font-medium whitespace-nowrap rounded-t-lg transition-colors border-b-2 -mb-px
               ${tab === t.id
                 ? 'text-[#9b59b6] border-[#9b59b6] bg-[#9b59b6]/5'
                 : 'text-gray-500 border-transparent hover:text-gray-300'}`}

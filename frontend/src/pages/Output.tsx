@@ -18,6 +18,7 @@ import { exportCard, exportCardAsPng } from '../utils/cardExporter'
 import { generationApi } from '../api/generation'
 import { presetsApi } from '../api/presets'
 import { lorebookApi } from '../api/lorebook'
+import { projectsApi } from '../api/projects'
 import type { FieldPreset, LorebookEntry } from '../types'
 import { CHARA_FIELDS } from '../types'
 
@@ -302,7 +303,8 @@ export default function Output() {
       setAvatarDataUrl(dataUrl)
       if (projectId) {
         try {
-          await updateProject(Number(projectId), { avatar: dataUrl })
+          await projectsApi.uploadAvatar(Number(projectId), file)
+          await fetchProject(Number(projectId))
         } catch {
           toast.error('Avatar carregado, mas não foi possível salvá-lo no projeto')
         }

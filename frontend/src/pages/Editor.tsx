@@ -1,38 +1,63 @@
 import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { Layers2, Wand2 } from 'lucide-react'
-import { useProjectStore } from '../store/useProjectStore'
-import { useContextCardStore } from '../store/useContextCardStore'
-import { useCardTypeStore } from '../store/useCardTypeStore'
+import { CheckCircle2, Loader2 } from 'lucide-react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { generationApi } from '../api/generation'
 import { ContextCardBoard } from '../components/context-cards/ContextCardBoard'
 import { ContextCardEditor } from '../components/context-cards/ContextCardEditor'
 import { GenerationPanel } from '../components/generation/GenerationPanel'
+import { useCardTypeStore } from '../store/useCardTypeStore'
+import { useContextCardStore } from '../store/useContextCardStore'
+import { useProjectStore } from '../store/useProjectStore'
+import type { GenerationJob } from '../types'
 
 type Tab = 'cards' | 'generate'
 
 export default function Editor() {
   const { projectId } = useParams<{ projectId: string }>()
   const id = Number(projectId)
+  const location = useLocation()
+  const navigate = useNavigate()
   const { fetchProject } = useProjectStore()
   const { fetchCards, selectedCard, setSelectedCard, updateCard } = useContextCardStore()
   const { fetchTypes } = useCardTypeStore()
-  const [tab, setTab] = useState<Tab>('cards')
+  const [tab, setTab] = useState<Tab>(location.pathname.endsWith('/generate') ? 'generate' : 'cards')
+  const [latestJob, setLatestJob] = useState<GenerationJob | null>(null)
+
+  useEffect(() => {
+    setTab(location.pathname.endsWith('/generate') ? 'generate' : 'cards')
+  }, [location.pathname])
 
   useEffect(() => {
     fetchProject(id)
     fetchCards(id)
     fetchTypes()
-  }, [id])
+    generationApi.listJobs(id).then(jobs => setLatestJob(jobs[0] || null)).catch(() => setLatestJob(null))
+  }, [id, fetchCards, fetchProject, fetchTypes])
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'cards',    label: 'Context Cards', icon: Layers2 },
-    { id: 'generate', label: 'Gerar',          icon: Wand2   },
-  ]
+  const jobIsActive = latestJob?.status === 'queued' || latestJob?.status === 'running'
+  const jobIsComplete = latestJob?.status === 'completed'
 
   return (
-    <>
-      {/* ── Desktop: three-pane layout ── */}
-      <div className="hidden lg:flex h-full">
+    <div className="flex h-full min-h-0 flex-col">
+      {(jobIsActive || jobIsComplete) && (
+        <button
+          type="button"
+          onClick={() => navigate(jobIsActive ? `/editor/${id}/generating?job=${latestJob.id}` : `/editor/${id}/output`)}
+          className="mx-3 mt-3 flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-lg border border-[#9b59b6]/40 bg-[#9b59b6]/10 px-4 py-2 text-left text-sm text-gray-200 transition-colors hover:bg-[#9b59b6]/20 lg:mx-5"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {jobIsActive ? <Loader2 size={17} className="shrink-0 animate-spin text-[#bb7bd0]" /> : <CheckCircle2 size={17} className="shrink-0 text-emerald-400" />}
+            <span className="truncate">
+              {jobIsActive
+                ? `Geração em andamento${latestJob.current_step ? `: ${latestJob.current_step}` : ''}`
+                : 'A última geração foi concluída'}
+            </span>
+          </span>
+          <span className="shrink-0 font-medium text-[#c889df]">{jobIsActive ? 'Acompanhar' : 'Ver resultado'}</span>
+        </button>
+      )}
+
+      <div className="hidden min-h-0 flex-1 lg:flex">
         <ContextCardBoard projectId={id} onSelectCard={setSelectedCard} />
         {selectedCard && (
           <ContextCardEditor
@@ -45,43 +70,18 @@ export default function Editor() {
         <GenerationPanel projectId={id} desktop />
       </div>
 
-      {/* ── Mobile/tablet: tabbed layout ── */}
-      <div className="flex flex-col lg:hidden h-full">
-        {/* Tab bar */}
-        <div className="flex border-b border-[#2a2a2a] bg-[#1a1a1a] shrink-0">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-medium
-                border-b-2 transition-colors
-                ${tab === t.id
-                  ? 'text-[#9b59b6] border-[#9b59b6]'
-                  : 'text-gray-500 border-transparent'
-                }`}
-            >
-              <t.icon size={14} />
-              {t.label}
-            </button>
-          ))}
+      <div className="flex min-h-0 flex-1 flex-col lg:hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {tab === 'cards' && <ContextCardBoard projectId={id} onSelectCard={setSelectedCard} />}
+          {tab === 'generate' && <GenerationPanel projectId={id} />}
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {tab === 'cards' && (
-            <ContextCardBoard projectId={id} onSelectCard={setSelectedCard} />
-          )}
-          {tab === 'generate' && (
-            <GenerationPanel projectId={id} />
-          )}
-        </div>
-
-        {/* Card editor as full-screen overlay on mobile */}
         <ContextCardEditor
           card={selectedCard}
           onClose={() => setSelectedCard(null)}
           onSave={updateCard}
         />
       </div>
-    </>
+    </div>
   )
 }

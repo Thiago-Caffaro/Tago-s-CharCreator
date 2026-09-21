@@ -140,10 +140,11 @@ export default function Dashboard() {
         character_name: data.name || '',
       })
 
-      await projectsApi.update(project.id, {
-        ...(avatarDataUrl ? { avatar: avatarDataUrl } : {}),
-        last_generated_card: JSON.stringify(card),
-      })
+      await projectsApi.update(project.id, { last_generated_card: JSON.stringify(card) })
+      if (avatarDataUrl) {
+        const blob = await fetch(avatarDataUrl).then(r => r.blob())
+        await projectsApi.uploadAvatar(project.id, new File([blob], 'avatar.png', { type: blob.type || 'image/png' }))
+      }
 
       let order = 0
       for (const { field, title } of IMPORT_FIELD_CARDS) {

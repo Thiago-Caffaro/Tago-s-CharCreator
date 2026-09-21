@@ -14,6 +14,7 @@ class CardGeneration(CardGenerationBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
     project: Optional["Project"] = Relationship(back_populates="generations")
 

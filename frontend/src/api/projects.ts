@@ -22,4 +22,9 @@ export const projectsApi = {
 
   importProject: (data: object) =>
     client.post<Project>('/projects/import', data).then(r => r.data),
+  uploadAvatar: (id: number, file: File) => {
+    const form = new FormData(); form.append('file', file)
+    return client.put<{ avatar: string }>(`/projects/${id}/avatar`, form, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data)
+  },
+  deleteAvatar: (id: number) => client.delete(`/projects/${id}/avatar`),
 }

@@ -27,6 +27,7 @@ class Project(ProjectBase, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_generated_card: Optional[str] = None
+    user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
 
     context_cards: List["ContextCard"] = Relationship(back_populates="project")
     lorebook_entries: List["LorebookEntry"] = Relationship(back_populates="project")
